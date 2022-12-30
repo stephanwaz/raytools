@@ -1,0 +1,27 @@
+include HISTORY.rst
+include LICENSE
+include README.rst
+include Makefile
+include tox.ini
+include *.in
+include *.sh
+include *.toml
+include MANIFEST
+global-exclude .DS_Store
+global-exclude *.bsp
+
+
+recursive-exclude tests .*
+recursive-include tests *
+recursive-exclude * __pycache__
+recursive-exclude * *.py[co]
+recursive-exclude * *.so
+
+recursive-include raytraverse *.bsp
+recursive-include docs *.rst conf.py Makefile make.bat *.jpg *.png *.gif *.css *.html *.txt
+recursive-exclude src .*
+
+include *.txt
+
+prune docs/_build
+
