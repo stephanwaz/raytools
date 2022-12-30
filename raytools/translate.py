@@ -260,18 +260,6 @@ def xyz2tp(xyz):
     return tpnorm(np.column_stack([theta, phi]))
 
 
-def tp2uv(thetaphi):
-    """calculate UV from theta (0-pi), phi"""
-    thetaphi = np.atleast_2d(thetaphi)
-    return xyz2uv(tp2xyz(thetaphi))
-
-
-def uv2tp(uv):
-    """calculate theta (0-pi), phi from UV"""
-    uv = np.atleast_2d(uv)
-    return xyz2tp(uv2xyz(uv))
-
-
 def aa2xyz(aa):
     """calculate altitude (0-90), azimuth (-180,180) from xyz"""
     aa = np.atleast_2d(aa)

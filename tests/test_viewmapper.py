@@ -71,3 +71,14 @@ def test_pixel():
     pb = vm.ray2pixel(rb.reshape(-1, 3), res).reshape(res, res, 2)
     p2 = np.concatenate((pb, pa), 0)
     assert np.allclose(pxy, p2)
+
+
+def test_idx2uv():
+    side = 100
+    vm = ViewMapper(jitterrate=0.25)
+    j = vm.idx2uv(np.arange(side**2), (side, side), jitter=True)
+    p = vm.idx2uv(np.arange(side**2), (side, side), jitter=False)
+    d = np.linalg.norm(p-j, axis=1)
+    ed = .25 / side / 2 * np.sqrt(2)
+    assert np.max(d) <= ed
+    assert np.max(d) >= ed / np.sqrt(2)

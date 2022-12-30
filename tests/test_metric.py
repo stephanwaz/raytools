@@ -8,6 +8,7 @@ import pytest
 from raytools import io
 from raytools.mapper import ViewMapper
 from raytools.evaluate import PositionIndex
+from raytools import translate
 import numpy as np
 
 
@@ -39,6 +40,21 @@ def test_get_pos_idx(tmpdir):
     posidx = posfinder.positions(vm, fimg).reshape(res, res)
     assert np.allclose(posidx, exp)
 
+def test_guth():
+    angs = np.linspace(0, 90, 19)
+    angr = angs * np.pi / 180
+    vecs = np.stack((np.cos(angr), np.zeros(19), np.sin(angr))).T
+    viewvec = translate.rotate_elem(((1, 0, 0),), 45)[0]
+    srcvecs = translate.rotate_elem(vecs, np.pi/4, degrees=False)
+    ang2 = translate.degrees(viewvec, srcvecs)
+    ang2r = translate.radians(viewvec, srcvecs)
+    assert np.allclose(angs, ang2)
+    assert np.allclose(angr, ang2r)
+    pos = PositionIndex()
+    posi = pos.positions_vec(viewvec, srcvecs)
+    x = np.minimum(angs, 55)/55
+    b = 2843.58*np.exp(x + 1.5*np.square(x))/179
+    assert np.all(np.logical_and(b/posi > 12, b/posi < 16))
 
 def test_position():
     vm = ViewMapper((.5, .5, -1), viewangle=180)

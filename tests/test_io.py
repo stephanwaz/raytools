@@ -31,6 +31,11 @@ def test_array2img(tmpdir):
     assert np.allclose(a.T, a2, atol=.25, rtol=.03)
     assert np.allclose(b.T, b2, atol=.25, rtol=.03)
     assert np.allclose(ar.T, ar2, atol=.25, rtol=.03)
+    a3 = io.hdr2carray('mgrid.hdr')
+    assert np.allclose(a3[0], a3[1])
+    io.array2hdr(a3, 'cgrid.hdr')
+    a4 = np.swapaxes(io.hdr2carray('cgrid.hdr'), 1, 2)
+    assert np.allclose(a3, a4, atol=.25, rtol=.03)
 
 
 def test_setproc():
@@ -46,6 +51,12 @@ def test_setproc():
     with pytest.raises(ValueError):
         io.set_nproc("7")
     assert io.get_nproc() == os.cpu_count()
+    io.set_nproc(6)
+    assert io.get_nproc() == 6
+    io.set_nproc(None)
+    assert io.get_nproc() == 6
+    io.set_nproc(0)
+    assert io.get_nproc() == os.cpu_count()
 
 
 def test_npbytefile(tmpdir):
@@ -53,3 +64,18 @@ def test_npbytefile(tmpdir):
     io.np2bytefile(a, "test_npbytefile")
     c = io.bytefile2np(open("test_npbytefile", 'rb'), (-1, 9))
     assert np.all(a == c)
+
+
+def test_load_txt(tmpdir):
+    np.savetxt("farray.txt", np.arange(100))
+    f = open("bad.txt", 'w')
+    f.write("a b, f, f\n")
+    f.close()
+    with pytest.raises(FileNotFoundError):
+        a = io.load_txt("farray.tsv")
+    with pytest.raises(ValueError):
+        a = io.load_txt("bad.txt")
+    with pytest.raises(TypeError):
+        a = io.load_txt(123)
+    a = io.load_txt("farray.txt")
+    assert np.allclose(a, np.arange(100))

@@ -71,6 +71,9 @@ def test_tp2xyz(thetas):
     xyz = translate.tp2xyz(thetas)
     theta2 = translate.xyz2tp(xyz)
     assert np.allclose(thetas, theta2)
+    aa = translate.xyz2aa(xyz)
+    xyz2 = translate.aa2xyz(aa)
+    assert np.allclose(xyz, xyz2)
 
 
 def test_chord():
@@ -138,5 +141,56 @@ def test_skybin():
     strxyz = io.np2bytes(pyt)
     rcalc = f"rcalc -if3 -of -f rayinit.cal -e 'Dx=$1;Dy=$2;Dz=$3;side={side}' -e '{exp}' -e '$1=bin'"
     rcalc = io.bytes2np(cst.pipeline([rcalc], inp=strxyz), (-1,))
+    pytc = translate.xyz2skybin(pyt[50], side, tol=.51)
+    assert np.allclose(pytc, [31, 32, 33, 49, 50, 51, 67, 68, 69])
     pyt = translate.xyz2skybin(pyt, side)
     assert np.allclose(pyt, rcalc)
+
+
+def test_resample():
+    img = np.zeros((10, 10))
+    img[4:6, 4:6] = 1
+    img2 = translate.resample(img, (5, 5))
+    img3 = translate.resample(img2, (10,10), gauss=False)
+    assert np.allclose(img, img3)
+    img4 = translate.resample(img2, (10,10))
+    img5 = translate.resample(img, radius=1)
+    assert np.allclose(img4, img5)
+    img6 = translate.resample(img, gauss=False, radius=2)
+    assert np.isclose(np.sum(img6), np.sum(img))
+
+
+def test_cull_vectors():
+    uv = translate.bin2uv(np.arange(128), 8)
+    xyz = translate.uv2xyz(uv)
+    mask = translate.cull_vectors(xyz, np.pi/9)
+    mask = mask.reshape(16, 8).T.astype(int)
+    assert np.alltrue(np.sum(mask, axis=0) == 4)
+    assert np.alltrue(np.sum(mask, axis=1) == 8)
+
+
+def test_reflect():
+    dxyz = translate.norm((.343, -.45, .1203))
+    vm = ViewMapper(dxyz, 180)
+    rays1 = vm.pixelrays(10)
+    vm2 = ViewMapper(-dxyz, 180)
+    rays2 = vm2.pixelrays(10)
+    rrays, rm = translate.reflect(rays1.reshape(-1, 3), dxyz)
+    rrays = rrays.reshape(rays1.shape)
+    assert np.allclose(rrays[::-1], rays2)
+
+
+def test_simple_take():
+    a = np.array([1, 2, 4])[:, None, None] * np.arange(1,11)[None, :, None] * \
+        np.arange(1, 11)[None, None]
+    b = translate.simple_take(a, 1, (0,1,2), slice(0, 10, 3))
+    c = [[[2,  8, 14, 20], [4, 16, 28, 40], [6, 24, 42, 60]]]
+    assert np.allclose(b, c)
+    b = translate.simple_take(a, None, 1, None)
+    c = np.array([1, 2, 4])[:, None, None] * 2 * \
+        np.arange(1, 11)[None, None]
+    assert np.allclose(b, c)
+    b = translate.simple_take(a, [0, 1], [0, 1], axes=(1, 2))
+    c = np.array([1, 2, 4])[:, None, None]*np.arange(1, 3)[None, :, None] * \
+        np.arange(1, 3)[None, None]
+    assert np.allclose(b, c)

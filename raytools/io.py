@@ -124,7 +124,7 @@ def _array2hdr(ar, imgf, header, pval):
         ar: np.array
             image array
         imgf: str
-            file path to right
+            file path to write
         header: list
             list of header lines to append to image header
         pval: str
