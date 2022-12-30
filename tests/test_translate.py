@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Tests for raytraverse.translate"""
+"""Tests for raytools.translate"""
 
 import pytest
 from raytools import translate, io

@@ -64,7 +64,6 @@ slowtest: ## run tests including slow decorator
 
 coverage: ## check code coverage quickly with the default Python
 	pytest --cov=raytools tests
-	#pytest --cov=raytraverse --cov-append --slowtest tests/test_skycalc.py tests/test_cli.py
 	coverage html
 	$(BROWSER) htmlcov/index.html
 
@@ -74,9 +73,6 @@ coverall: coverage
 docs: pdocs showdocs## generate Sphinx HTML documentation, including API docs
 
 pdocs:
-	# rm -f docs/raytraverse.rst
-	# rm -f docs/modules.rst
-	# sphinx-apidoc -o docs/ raytraverse
 	$(MAKE) -C docs clean
 	$(MAKE) -C docs html
 

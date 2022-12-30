@@ -6,11 +6,11 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # =======================================================================
 
-"""Top-level package for raytraverse."""
+"""Top-level package for raytools."""
 
 __author__ = """Stephen Wasilewski"""
 __email__ = 'stephanwaz@gmail.com'
-__version__ = '0.1.1'
+__version__ = '0.0.0'
 __all__ = ['evaluate', 'io', 'imagetools', 'mapper',
            'translate', 'utility']
 

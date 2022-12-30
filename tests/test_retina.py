@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Tests for raytraverse.integrate.retina"""
+"""Tests for raytools.evaluate.retina"""
 import os
 
 import pytest

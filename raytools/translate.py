@@ -140,7 +140,7 @@ a = if(pi4 - phi, r, if(3*pi4 - phi, -(phi - PI/2)*r/pi4, if(5*pi4 - phi,"""
 b = if(pi4 - phi, phi*r/pi4, if(3*pi4 - phi, r, if(5*pi4 - phi, """
              """-(phi - PI)*r/pi4, -r)));
 
-{ map to (0,2),(0,1) matches raytraverse.translate.xyz2uv}
+{ map to (0,2),(0,1) matches raytools.translate.xyz2uv}
 U = (if(n, 1, 3) - a*n)/2;
 V = (b + 1)/2;
 

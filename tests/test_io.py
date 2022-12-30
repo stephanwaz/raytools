@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Tests for raytraverse.io"""
+"""Tests for raytools.io"""
 import os
 import re
 

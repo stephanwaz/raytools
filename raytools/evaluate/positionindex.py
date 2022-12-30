@@ -29,7 +29,7 @@ class PositionIndex(object):
 
         Parameters
         ----------
-        vm: raytraverse.mapper.ViewMapper
+        vm: raytools.mapper.ViewMapper
             the view/analysis point, should have 180 degree field of view
         vec: np.array
             shape (N,3) the view vectors to calculate

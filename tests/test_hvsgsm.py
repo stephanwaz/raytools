@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Tests for raytraverse.evaluate.hvsgsm"""
+"""Tests for raytools.evaluate.hvsgsm"""
 import os
 import shutil
 

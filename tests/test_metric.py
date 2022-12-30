@@ -1,13 +1,13 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Tests for raytraverse.metric"""
+"""Tests for raytools.evaluate.metric"""
 import os
 
 import pytest
 from raytools import io
 from raytools.mapper import ViewMapper
-from raytools.evaluate import MetricSet, PositionIndex
+from raytools.evaluate import PositionIndex
 import numpy as np
 
 

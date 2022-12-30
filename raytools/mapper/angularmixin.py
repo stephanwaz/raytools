@@ -14,7 +14,7 @@ from raytools import translate
 
 class AngularMixin(object):
     """includes overrides of transformation functions for angular type mapper
-    classes. Inherit before raytraverse.mapper.Mapper eg::
+    classes. Inherit before raytools.mapper.Mapper eg::
 
         NewMapper(AngularMixin, Mapper)
 

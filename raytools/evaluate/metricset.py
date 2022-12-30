@@ -24,7 +24,7 @@ class MetricSet(BaseMetricSet):
 
     Parameters
     ----------
-    vm: raytraverse.mapper.ViewMapper
+    vm: raytools.mapper.ViewMapper
         the view direction
     vec: np.array
         (N, 3) directions of all rays in view

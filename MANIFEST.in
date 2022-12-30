@@ -17,7 +17,6 @@ recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * *.so
 
-recursive-include raytraverse *.bsp
 recursive-include docs *.rst conf.py Makefile make.bat *.jpg *.png *.gif *.css *.html *.txt
 recursive-exclude src .*
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-"""Tests for raytraverse.scene"""
+"""Tests for raytools.scene"""
 import pytest
 from raytools import translate
 from raytools.mapper import ViewMapper
