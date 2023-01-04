@@ -13,6 +13,7 @@ from scipy.ndimage import convolve, gaussian_filter
 import clasp.script_tools as cst
 from raytools import io
 from raytools import imagetools as itl
+from raytools.evaluate import PositionIndex
 from raytools.utility import pool_call
 from raytools.mapper import ViewMapper
 
@@ -130,10 +131,8 @@ class GSS:
     Parameters
     ----------
     view:
-        can be None, a view file, a ViewMapperr, or an hdrimage with
+        can be None, a view file, a ViewMapper, or an hdrimage with
         a valid view specification (must be -vta)
-    gst:
-        glare source threshold (cd/m^2)
     age:
         age of observer
     f:
@@ -173,7 +172,6 @@ class GSS:
     adaptation and or isolating glare sources::
 
         e_g, pupa, pupd = self.adapt(ev_eye)
-        img_gs = self.get_glare_sources()
         r_g, parrays = self.glare_response(img_gs, e_g, pupa, pupd,
         return_arrays=True)
 
@@ -204,10 +202,9 @@ class GSS:
     # 0.9 outdoor (high) -- maybe daylight is always here?
     contrast = 0.8
 
-    def __init__(self, view=None, gst=0, age=40, f=16.67, scale=179,
+    def __init__(self, view=None, age=40, f=16.67, scale=179,
                  pigmentation=0.106, fwidth=10, psf=True, adaptmove=True,
                  directmove=True, raw=False):
-        self.gst = gst
         self.age = age
         self.f = f
         self.scale = scale
@@ -250,15 +247,6 @@ class GSS:
         pupa, pupd = self.pupil(ev_eye)
         e_g = self.retinal_irradiance(ev_eye/np.pi, pupa)
         return e_g, pupa, pupd
-
-    def get_glare_sources(self):
-        """step 2 in compute, isolate glare sources"""
-        if self.lum is None:
-            raise ValueError("cannot get_glare_sources until an image has been "
-                             "set")
-        img_gs = np.copy(self.lum, 'C')
-        img_gs[self.lum < self.gst] = 0
-        return img_gs
 
     def glare_response(self, img_gs, e_g, pupa, pupd, return_arrays=False):
         """step 3 in compute, apply steps of Vissenberg et al. model
@@ -338,11 +326,9 @@ class GSS:
         if self.lum is None:
             raise ValueError("cannot compute until an image has been set")
         e_g, pupa, pupd = self.adapt(ev_eye)
-        # img_gs = self.get_glare_sources()
         # swap comment to mask after response
         img_gs = self.lum
         r_g = self.glare_response(img_gs, e_g, pupa, pupd)
-        # r_g[:, self.lum < self.gst] = 0
         if save is not None:
             r_gc = np.stack((*r_g, np.zeros(r_g.shape[1:])))
             io.carray2hdr(r_gc, save)
@@ -372,7 +358,8 @@ class GSS:
             self._res = r
             self._pparcmin = self.res/(60*self.vm.viewangle)
             self.sigma_c = r
-        self._ecc = np.average(self.sigma_c, weights=np.power(self._lum, 4))
+        self._ecc = np.average(self.sigma_c,
+                               weights=np.power(self._lum, 4) * self.omega)
 
     @property
     def res(self):
@@ -418,9 +405,6 @@ class GSS:
                        np.square(vecc)), 1)
         s_c = p*(self.emax - self.emin) + self.emin
         self._sigma_c = s_c.reshape(r, r)
-        # pos = (PositionIndex().positions(self.vm, self.vecs.reshape(-1, 3)) - 1) / 15
-        # pos = pos*(self.emax - self.emin) + self.emin
-        # self._sigma_c = pos.reshape(r, r)
 
     @property
     def vm(self):
@@ -786,7 +770,7 @@ class GSS:
                                           -104.614198351476, -275.450102180091,
                                           1587.82553529394, -2570.6813747583033,
                                           1837.1741161137818, -499.849190278],
-                                          window=[0, 1], domain=[0.009, 0.12])
+                                         window=[0, 1], domain=[0.009, 0.12])
             gss *= p(self.ecc)
         return gss
 

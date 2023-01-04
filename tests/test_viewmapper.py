@@ -92,7 +92,7 @@ def test_image():
     img = vm.add_vecs_to_img(img, avecs, mask=mask)
     img[mask] += 1
     assert np.isclose(np.sum(img), 162)
-    assert np.allclose(2, img[(4, 14), (7,7)])
+    assert np.allclose(2, img[(4, 15), (7,7)])
     vm = ViewMapper(viewangle=180)
     img, vecs, mask, mask2, header = vm.init_img(10, features=3)
     img = vm.add_vecs_to_img(img, avecs, grow=1)

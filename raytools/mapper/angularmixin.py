@@ -25,7 +25,7 @@ class AngularMixin(object):
         self._ivm = ivm
     """
 
-    _flipu = True
+    _flipu = False
     _xsign = -1
 
     def xyz2uv(self, xyz):

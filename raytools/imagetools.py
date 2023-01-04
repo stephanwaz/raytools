@@ -26,19 +26,20 @@ def array_uv2ang(imarray):
     ij = translate.uv2ij(uv[mask], res)
     if len(imarray.shape) == 3:
         img = np.zeros((3, res*res))
-        img[:, mask] = imarray[:, ij[:, 1], ij[:, 0]]
-        return img.reshape(3, res, res)[:, ::-1]
+        img[:, mask] = imarray[:, ij[:, 0], ij[:, 1]]
+        return img.reshape(3, res, res)
     else:
         img = np.zeros(res*res)
-        img[mask] = imarray[ij[:, 1], ij[:, 0]]
-        return img.reshape(res, res)[::-1]
+        img[mask] = imarray[ij[:, 0], ij[:, 1]]
+        return img.reshape(res, res)
 
 
-def hdr_uv2ang(imgf):
+def hdr_uv2ang(imgf, **kwargs):
     imarray = io.hdr2carray(imgf)
     outf = imgf.rsplit(".", 1)[0] + "_ang.hdr"
     img = array_uv2ang(imarray)
     io.carray2hdr(img, outf)
+    return outf
 
 
 def array_ang2uv(imarray, vm=None):
@@ -49,9 +50,9 @@ def array_ang2uv(imarray, vm=None):
     xyz = vm.uv2xyz(uv)
     pxy = vm.ray2pixel(xyz, imarray.shape[-1])
     if len(imarray.shape) == 3:
-        return imarray[:, pxy[:, 1], pxy[:, 0]].reshape(3, res, res)[:, ::-1]
+        return imarray[:, pxy[:, 0], pxy[:, 1]].reshape(3, res, res)
     else:
-        return imarray[pxy[:, 1], pxy[:, 0]].reshape(res, res)[::-1]
+        return imarray[pxy[:, 0], pxy[:, 1]].reshape(res, res)
 
 
 def hdr_ang2uv(imgf, useview=True):
@@ -64,6 +65,7 @@ def hdr_ang2uv(imgf, useview=True):
     outf = imgf.rsplit(".", 1)[0] + "_uv.hdr"
     img = array_ang2uv(imarray, vm)
     io.carray2hdr(img, outf)
+    return outf
 
 
 def hdr2vol(imgf, vm=None):

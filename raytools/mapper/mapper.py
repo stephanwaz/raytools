@@ -167,7 +167,6 @@ class Mapper(object):
         pxy = self.xyz2vxy(xyz) * np.array([[xres, yres]])
         if integer:
             pxy = np.floor(pxy).astype(int)
-        pxy[:, 0] = xres - 1 - pxy[:, 0]
         return pxy
 
     def pixel2ray(self, pxy, res):
