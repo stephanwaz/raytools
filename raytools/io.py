@@ -174,8 +174,8 @@ def array2hdr(ar, imgf, header=None):
     """
     if len(ar.shape) > 2:
         return carray2hdr(ar, imgf, header)
-    pval = f'pvalue -r -b -h -H -df -o -y {ar.shape[1]} +x {ar.shape[0]}'
-    return _array2hdr(ar[-1::-1, -1::-1].T, imgf, header, pval)
+    pval = f'pvalue -r -b -h -H -df -o -y {ar.shape[-1]} +x {ar.shape[-2]}'
+    return _array2hdr(ar.T[::-1], imgf, header, pval)
 
 
 def carray2hdr(ar, imgf, header=None):
@@ -195,7 +195,7 @@ def carray2hdr(ar, imgf, header=None):
     imgf
     """
     pval = f'pvalue -r -h -H -df -o -y {ar.shape[-1]} +x {ar.shape[-2]}'
-    return _array2hdr(ar.T[-1::-1, -1::-1, :], imgf, header, pval)
+    return _array2hdr(ar.T[::-1], imgf, header, pval)
 
 
 def hdr2array(imgf, stdin=None):
@@ -216,7 +216,7 @@ def hdr2array(imgf, stdin=None):
     p = Popen(shlex.split(pval), stdin=stdin, stdout=PIPE)
     shape = p.stdout.readline().strip().split()
     shape = (int(shape[-3]), int(shape[-1]))
-    return bytes2np(p.stdout.read(), shape)[-1::-1, -1::-1]
+    return bytes2np(p.stdout.read(), shape).T[:, ::-1]
 
 
 def hdr2carray(imgf, stdin=None):
@@ -236,7 +236,7 @@ def hdr2carray(imgf, stdin=None):
     p = Popen(shlex.split(pval), stdin=stdin, stdout=PIPE)
     shape = p.stdout.readline().strip().split()
     shape = (3, int(shape[-3]), int(shape[-1]))
-    return bytes2np(p.stdout.read(), shape)[:, -1::-1, -1::-1]
+    return np.transpose(bytes2np(p.stdout.read(), shape)[:, ::-1], (0, 2, 1))
 
 
 def rgb2rad(rgb, vlambda=(0.265, 0.670, 0.065)):

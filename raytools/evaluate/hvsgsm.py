@@ -359,7 +359,7 @@ class GSS:
     @lum.setter
     def lum(self, img):
         """reads image and updates view based values if necessary"""
-        self._lum = io.hdr2array(img).T*self.scale
+        self._lum = io.hdr2array(img)*self.scale
         r = self._lum.shape[0]
         if self._res != r:
             self._vecs = self.vm.pixelrays(r)

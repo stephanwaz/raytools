@@ -9,6 +9,9 @@
 # =======================================================================
 
 """The setup script."""
+import sys
+from glob import glob
+
 from setuptools import find_packages, setup
 
 with open('README.rst') as readme_file:
@@ -23,8 +26,13 @@ setup_requirements = ["setuptools", "wheel"]
 
 test_requirements = ['pytest', 'pytest-cov']
 
-data_files = []
-package_data = {}
+if sys.platform.startswith('darwin'):
+    data_files = [('bin', glob('radiance_depend/macos/*'))]
+else:
+    data_files = [('bin', glob('radiance_depend/linux/*'))]
+
+
+package_data = {"raytools": ["cal/*.cal"]}
 
 setup(
     author="Stephen Wasilewski",

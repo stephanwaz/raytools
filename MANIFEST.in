@@ -17,6 +17,9 @@ recursive-exclude * __pycache__
 recursive-exclude * *.py[co]
 recursive-exclude * *.so
 
+recursive-exclude radiance_depend .*
+recursive-include radiance_depend *
+recursive-include raytools *.cal
 recursive-include docs *.rst conf.py Makefile make.bat *.jpg *.png *.gif *.css *.html *.txt
 recursive-exclude src .*
 

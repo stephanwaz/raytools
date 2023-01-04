@@ -67,7 +67,7 @@ def hdr_ang2uv(imgf, useview=True):
 
 
 def hdr2vol(imgf, vm=None):
-    ar = io.hdr2array(imgf).T
+    ar = io.hdr2array(imgf)
     if vm is None:
         vm = hdr2vm(imgf)
     vecs = vm.pixelrays(ar.shape[-1]).reshape(-1, 3)

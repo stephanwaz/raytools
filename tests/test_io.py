@@ -3,7 +3,6 @@
 
 """Tests for raytools.io"""
 import os
-import re
 
 import pytest
 from raytools import io
@@ -24,20 +23,20 @@ def test_array2img(tmpdir, capfd):
     ar = a*b
     io.array2hdr(ar, None)
     captured = capfd.readouterr()
-    assert len(captured.out) == 706594
+    assert captured.out.startswith("#?RADIANCE\npvalue")
     io.array2hdr(ar, 'mgrid.hdr')
     io.array2hdr(a, 'mgrida.hdr')
     io.array2hdr(b, 'mgridb.hdr')
     a2 = io.hdr2array('mgrida.hdr')
     b2 = io.hdr2array('mgridb.hdr')
     ar2 = io.hdr2array('mgrid.hdr')
-    assert np.allclose(a.T, a2, atol=.25, rtol=.03)
-    assert np.allclose(b.T, b2, atol=.25, rtol=.03)
-    assert np.allclose(ar.T, ar2, atol=.25, rtol=.03)
+    assert np.allclose(a, a2, atol=.25, rtol=.03)
+    assert np.allclose(b, b2, atol=.25, rtol=.03)
+    assert np.allclose(ar, ar2, atol=.25, rtol=.03)
     a3 = io.hdr2carray('mgrid.hdr')
     assert np.allclose(a3[0], a3[1])
     io.array2hdr(a3, 'cgrid.hdr')
-    a4 = np.swapaxes(io.hdr2carray('cgrid.hdr'), 1, 2)
+    a4 = io.hdr2carray('cgrid.hdr')
     assert np.allclose(a3, a4, atol=.25, rtol=.03)
 
 

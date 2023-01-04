@@ -40,7 +40,7 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then
             echo -n "ok to push (y/n)? "
             read -r answer
             if [ "$answer" != "${answer#[Yy]}" ] ;then
-                twine upload dist/*.tar.gz dist/*.whl
+                twine upload dist/*.tar.gz
                 git push
                 git checkout master
                 git merge release

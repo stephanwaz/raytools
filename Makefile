@@ -86,7 +86,7 @@ servedocs: docs ## compile the docs watching for changes
 #	twine upload dist/*
 
 dist: clean ## builds source and wheel package
-	python setup.py sdist bdist_wheel
+	python setup.py sdist
 	ls -l dist
 
 install: clean ## install the package to the active Python's site-packages
