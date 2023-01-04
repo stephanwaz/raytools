@@ -169,6 +169,7 @@ class AngularMixin(object):
                 pb = self.ray2pixel(v[np.logical_not(reverse)], res)
                 xp = np.concatenate((pa[:, 0], pb[:, 0]))
                 yp = np.concatenate((pa[:, 1], pb[:, 1]))
+                pb = np.stack((xp, yp)).T
             else:
                 pb = self.ray2pixel(v, res)
                 xp = pb[:, 0]
@@ -221,9 +222,9 @@ class AngularMixin(object):
                                  vec.reshape(-1, vec.shape[-1])), -1, 1)
 
     def radians(self, vec):
-        """angle in radians betweeen vieew direction and vec"""
+        """angle in radians betweeen view direction and vec"""
         return np.arccos(self.ctheta(vec))
 
     def degrees(self, vec):
-        """angle in degrees betweeen vieew direction and vec"""
+        """angle in degrees betweeen view direction and vec"""
         return self.radians(vec) * 180/np.pi

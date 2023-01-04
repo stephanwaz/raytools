@@ -19,9 +19,12 @@ def tmpdir(tmp_path_factory):
     os.chdir(cpath)
 
 
-def test_array2img(tmpdir):
+def test_array2img(tmpdir, capfd):
     b, a = np.mgrid[0:600, 0:400]
     ar = a*b
+    io.array2hdr(ar, None)
+    captured = capfd.readouterr()
+    assert len(captured.out) == 706594
     io.array2hdr(ar, 'mgrid.hdr')
     io.array2hdr(a, 'mgrida.hdr')
     io.array2hdr(b, 'mgridb.hdr')
@@ -79,3 +82,18 @@ def test_load_txt(tmpdir):
         a = io.load_txt(123)
     a = io.load_txt("farray.txt")
     assert np.allclose(a, np.arange(100))
+
+
+def test_rgb(tmpdir):
+    rgb = np.random.default_rng(0).random((20, 3))
+    # rgb = np.stack((np.arange(20), np.arange(20), np.arange(20))).T
+    rad = io.rgb2rad(rgb)
+    lum = io.rgb2lum(rgb)
+    assert np.allclose(rad, lum/179)
+    io.carray2hdr(rgb.T[:, None, :], "random.hdr")
+    f = open("random.hdr", 'rb')
+    p = io.Popen(['getinfo', '-d', '-'], stdin=f, stdout=io.PIPE)
+    rgbe = io.bytefile2np(p.stdout, (20, 4), '<B').astype(int)[::-1]
+    lum2 = io.rgbe2lum(rgbe)
+    assert np.allclose(lum2, lum, rtol=.01)
+

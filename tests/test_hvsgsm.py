@@ -41,11 +41,5 @@ def test_init(tmpdir):
 def test_lumset(tmpdir):
     gss = GSS("oct21_detail_glz_EW_desk.hdr", age=35, pigmentation=0.142)
     assert np.allclose(gss.vm.dxyz, (-1, 0, 0))
-    # bs, cs = gss.psf_coef(2)
-    # a = "z = log((x * π/180)^2 * "
-    # for b, c in zip(bs, cs):
-    #     print(f"b: {b:.05f}, c: {c:.05f}")
-    #     print("z = log(10^(x*π/180))^2 * c * b/(2 * π * (sin^2(10^(x*π/180)) + b^2*cos^2(10^(x*π/180)))^1.5))")
-    # a = a[:-2] + ")"
-    # print(a)
+    assert np.isclose(1.5561930346273223, gss.compute(), rtol=.03)
 

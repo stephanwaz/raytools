@@ -4,7 +4,7 @@
 """Tests for raytools.scene"""
 import pytest
 from raytools import translate
-from raytools.mapper import ViewMapper
+from raytools.mapper import ViewMapper, Mapper
 import numpy as np
 
 
@@ -82,3 +82,35 @@ def test_idx2uv():
     ed = .25 / side / 2 * np.sqrt(2)
     assert np.max(d) <= ed
     assert np.max(d) >= ed / np.sqrt(2)
+
+
+def test_image():
+    vm = ViewMapper()
+    img, vecs, mask, mask2, header = vm.init_img(10, (0, 1, 2), features=1)
+    assert header == "VIEW= -vta -vv 180 -vh 180 -vd 0.0 1.0 0.0 -vp 0 1 2 -vu 0 0 1"
+    avecs = translate.norm(np.array(((0, -1, 1), (0, 1, 1))))
+    img = vm.add_vecs_to_img(img, avecs, mask=mask)
+    img[mask] += 1
+    assert np.isclose(np.sum(img), 162)
+    assert np.allclose(2, img[(4, 14), (7,7)])
+    vm = ViewMapper(viewangle=180)
+    img, vecs, mask, mask2, header = vm.init_img(10, features=3)
+    img = vm.add_vecs_to_img(img, avecs, grow=1)
+    assert np.isclose(np.sum(img), 9)
+    assert np.isclose(np.sum(img[0, 3:6, 6:9]), 9)
+    img, vecs, mask, mask2, header = vm.init_img(10)
+    img = vm.add_vecs_to_img(img, avecs, fisheye=False)
+    assert img[4, 7] > 0
+
+
+def test_mapper():
+    vm = Mapper(sf=(1, 2), bbox=((0, 0), (1, 1)))
+    img, vecs, mask, mask2, header = vm.init_img(10)
+    assert header == "VIEW= -vtl -vv 1 -vh 1"
+    avec = np.array(((0, 0, 0), (0, 1.9, 0), (.9, 0, 0), (.9, 1.9, 0), (1, 2, 0)))
+    img = vm.add_vecs_to_img(img, avec)
+    assert np.isclose(np.sum(img), 4)
+    img[:] = 0
+    avec = np.array(((.45, .9, 0),))
+    img = vm.add_vecs_to_img(img, avec, grow=1)
+    assert np.isclose(np.sum(img), 9)

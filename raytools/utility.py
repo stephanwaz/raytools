@@ -102,6 +102,14 @@ def pool_call(func, args, *fixed_args, cap=None, expandarg=True,
     sequence of results from func (order preserved)
     """
     results = []
+    if not workers:
+        result = []
+        for arg in args:
+            if expandarg:
+                result.append(func(*arg, *fixed_args, **kwargs))
+            else:
+                result.append(func(arg, *fixed_args, **kwargs))
+        return result
     with TStqdm(workers=workers, total=len(args), cap=cap,
                 desc=desc, disable=not pbar) as pbar:
         exc = pbar.pool

@@ -90,7 +90,7 @@ class Mapper(object):
     def uv2xyz(self, uv, stackorigin=False):
         """transform from mapper UV space to world xyz"""
         uv = self.bbox[None, 0] + np.reshape(uv, (-1, 2))*self._sf[None, :]
-        xyz = self.view2world(np.hstack((uv, np.zeros(len(uv), 1))))
+        xyz = self.view2world(np.hstack((uv, np.zeros((len(uv), 1)))))
         if stackorigin:
             xyz = np.hstack((np.broadcast_to(self.origin, xyz.shape), xyz))
         return xyz
@@ -186,8 +186,8 @@ class Mapper(object):
     def in_view(self, vec, indices=True):
         """generate mask for vec that are in the field of view"""
         uv = self.xyz2uv(vec)
-        mask = np.logical_and(uv[:, 0] >= 0, uv[:, 0] <= 1,
-                              uv[:, 1] >= 0, uv[:, 1] <= 1)
+        mask = np.logical_and(np.logical_and(uv[:, 0] >= 0, uv[:, 0] <= 1),
+                              np.logical_and(uv[:, 1] >= 0, uv[:, 1] <= 1))
         if indices:
             return np.unravel_index(np.arange(vec.shape[0])[mask],
                                     vec.shape[:-1])
@@ -235,6 +235,12 @@ class Mapper(object):
         pxy = self.ray2pixel(v, img.shape[-2:])
         xp = pxy[:, 0]
         yp = pxy[:, 1]
+        mask = np.logical_and(np.logical_and(xp >= 0, xp < img.shape[-2]),
+                              np.logical_and(yp >= 0, yp < img.shape[-1]))
+        if np.sum(mask) == 0:
+            return img
+        xp = xp[mask]
+        yp = yp[mask]
         r = int(grow*2 + 1)
         if len(img.shape) == 2:
             try:
@@ -242,12 +248,12 @@ class Mapper(object):
             except TypeError:
                 channel = channels
             img[xp, yp] = channel
-            if grow > 1:
+            if grow > 0:
                 img = uniform_filter(img*r**2, r)
         else:
             imgv = np.moveaxis(img, 0, 2)
             imgv[xp, yp] = channels
-            if grow > 1:
+            if grow > 0:
                 img = uniform_filter(img*r**2, (1, r, r))
         return img
 

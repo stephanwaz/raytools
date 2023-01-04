@@ -28,7 +28,6 @@ def test_rgcf_density(tmpdir):
                     6.09887818e+00, 7.10039102e+00, 8.49759373e+00,
                     1.05803866e+01, 1.40277281e+01, 2.08498700e+01,
                     4.08354445e+01, 2.77280566e+04])
-    # imagetools.uvarray2hdr(density.reshape(grid, grid), "density.hdr")
     test = np.quantile(density, np.linspace(.1, 1, 10))
     assert np.allclose(ref, test, atol=.01, rtol=.01)
 
@@ -42,6 +41,16 @@ def test_rgc_density(tmpdir):
                     12.76227423, 17.14212168, 21.7143411,
                     28.35079283, 43.31721288, 89.69326626,
                     2190.76230207])
-    # imagetools.uvarray2hdr(density.reshape(grid, grid), "density2.hdr")
     test = np.quantile(density, np.linspace(.1, 1, 10))
     assert np.allclose(ref, test, rtol=.01)
+
+
+def test_blur_sun(tmpdir):
+    peaka = 6.7967e-05
+    peakl = 2000
+    corrf = retina.blur_sun(peaka, peakl)
+    assert np.isclose(3.4361936638147172, corrf)
+    peaka = np.array([0.5, 1., 2]) * peaka
+    peakl = np.array([2, 1, .5]) * peakl
+    corrf = retina.blur_sun(peaka, peakl)
+    assert np.allclose([7.70249279, 3.43619366, 1.93395873], corrf)

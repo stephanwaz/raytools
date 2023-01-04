@@ -17,18 +17,41 @@ from raytools.evaluate import MetricSet, retina
 from raytools.mapper.viewmapper import ViewMapper
 
 
-def hdr_uv2ang(imgf, useview=None):
-    imarray = io.hdr2carray(imgf)
-    outf = imgf.rsplit(".", 1)[0] + "_ang.hdr"
+def array_uv2ang(imarray):
     res = imarray.shape[-1]
     vm = ViewMapper(viewangle=180)
     pixelxyz = vm.pixelrays(res)
     uv = vm.xyz2uv(pixelxyz.reshape(-1, 3))
     mask = vm.in_view(pixelxyz, indices=False)
     ij = translate.uv2ij(uv[mask], res)
-    img = np.zeros((3, res*res))
-    img[:, mask] = imarray[:, ij[:, 1], ij[:, 0]]
-    io.carray2hdr(img.reshape(3, res, res)[:, ::-1], outf)
+    if len(imarray.shape) == 3:
+        img = np.zeros((3, res*res))
+        img[:, mask] = imarray[:, ij[:, 1], ij[:, 0]]
+        return img.reshape(3, res, res)[:, ::-1]
+    else:
+        img = np.zeros(res*res)
+        img[mask] = imarray[ij[:, 1], ij[:, 0]]
+        return img.reshape(res, res)[::-1]
+
+
+def hdr_uv2ang(imgf):
+    imarray = io.hdr2carray(imgf)
+    outf = imgf.rsplit(".", 1)[0] + "_ang.hdr"
+    img = array_uv2ang(imarray)
+    io.carray2hdr(img, outf)
+
+
+def array_ang2uv(imarray, vm=None):
+    if vm is None:
+        vm = ViewMapper(viewangle=180)
+    res = imarray.shape[-1]
+    uv = translate.bin2uv(np.arange(res*res), res)
+    xyz = vm.uv2xyz(uv)
+    pxy = vm.ray2pixel(xyz, imarray.shape[-1])
+    if len(imarray.shape) == 3:
+        return imarray[:, pxy[:, 1], pxy[:, 0]].reshape(3, res, res)[:, ::-1]
+    else:
+        return imarray[pxy[:, 1], pxy[:, 0]].reshape(res, res)[::-1]
 
 
 def hdr_ang2uv(imgf, useview=True):
@@ -39,38 +62,8 @@ def hdr_ang2uv(imgf, useview=True):
         vm = ViewMapper(viewangle=180)
     imarray = io.hdr2carray(imgf)
     outf = imgf.rsplit(".", 1)[0] + "_uv.hdr"
-    res = imarray.shape[-1]
-    uv = translate.bin2uv(np.arange(res*res), res)
-    vm2 = ViewMapper(viewangle=180)
-    xyz = vm.uv2xyz(uv)
-    pxy = vm.ray2pixel(xyz, imarray.shape[-1])
-    # img = np.take_along_axis(imarray, pxy.T, 0)
-    img = imarray[:, pxy[:, 1], pxy[:, 0]].reshape(3, res, res)
-    io.carray2hdr(img[:, ::-1], outf)
-
-
-def uvarray2hdr(uvarray, imgf, header=None):
-    res = uvarray.shape[0]
-    vm = ViewMapper(viewangle=180)
-    pixelxyz = vm.pixelrays(res)
-    uv = vm.xyz2uv(pixelxyz.reshape(-1, 3))
-    mask = vm.in_view(pixelxyz, indices=False)
-    ij = translate.uv2ij(uv[mask], res)
-    img = np.zeros(res*res)
-    img[mask] = uvarray[ij[:, 0], ij[-1:None:-1, 1]]
-    io.array2hdr(img.reshape(res, res), imgf, header)
-
-
-def hdr2uvarray(imgf, vm=None, res=None):
-    if vm is None:
-        vm = hdr2vm(imgf)
-    imarray = io.hdr2array(imgf)
-    if res is None:
-        res = imarray.shape[0]
-    uv = translate.bin2uv(np.arange(res*res), res)
-    xyz = vm.uv2xyz(uv)
-    pxy = vm.ray2pixel(xyz, imarray.shape[0])
-    return imarray[pxy[:, 1], pxy[:, 0]].reshape(res, res)
+    img = array_ang2uv(imarray, vm)
+    io.carray2hdr(img, outf)
 
 
 def hdr2vol(imgf, vm=None):
@@ -143,7 +136,7 @@ def hdr2vm(imgf, vpt=False):
 
 
 def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
-                   blursun=False):
+                   blursun=False, blurtol=0.75):
     """consolidate the brightest pixels represented by v, o, l up into a single
     source, correcting the area while maintaining equal energy
 
@@ -166,6 +159,9 @@ def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
         partially visible sun.
     blursun: bool, optional
         whether to correct area and luminance according to human PSF
+    blurtol: float, optional
+        when checking for su visibility this enables an averaging of near peak values
+        whick could be an artifact from pfilt. set to 1 to disable.
 
     Returns
     -------
@@ -190,8 +186,10 @@ def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
         dm = pd > cosrad
         pc = pc[dm]
         pvol = pvol[dm]
+        # this handles image filtering/bluring
+        nearpeak = pvol[0, 4] * blurtol <= pvol[:, 4]
         # calculate expected energy assuming full visibility:
-        esun = pvol[0, 4]*peaka
+        esun = np.average(pvol[nearpeak, 4])*peaka
         # sum up to peak energy
         cume = np.cumsum(pvol[:, 3]*pvol[:, 4])
         # when there is enough energy, treat as full sun
