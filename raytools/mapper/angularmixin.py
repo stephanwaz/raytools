@@ -25,8 +25,8 @@ class AngularMixin(object):
         self._ivm = ivm
     """
 
-    _flipu = False
-    _xsign = 1
+    _flipu = True
+    _xsign = -1
 
     def xyz2uv(self, xyz):
         """transform from world xyz space to mapper UV space"""
@@ -61,7 +61,7 @@ class AngularMixin(object):
         """transform from view image space (2d) to world xyz"""
         pxy = np.atleast_2d(xy)
         pxy -= .5
-        pxy *= (self.viewangle * self._chordfactor) / 180
+        pxy *= np.array([self._xsign, 1]) * (self.viewangle * self._chordfactor) / 180
         d = np.sqrt(np.sum(np.square(pxy), -1))
         z = np.cos(np.pi*d)
         nperr = np.seterr(all="ignore")
@@ -185,8 +185,8 @@ class AngularMixin(object):
             xp = xp[mask]
             yp = yp[mask]
         else:
-            pa = translate.uv2ij(self.xyz2uv(v), res)
-            xp = res - 1 - pa[:, 0]
+            pa = translate.uv2ij(self.xyz2uv(v[self.in_view(v)]), res)
+            xp = pa[:, 0]
             yp = pa[:, 1]
         r = int(grow*2 + 1)
         if len(img.shape) == 2:
@@ -194,6 +194,7 @@ class AngularMixin(object):
                 channel = channels[0]
             except TypeError:
                 channel = channels
+            print(xp, yp, res, img.shape)
             img[xp, yp] = channel
             if grow > 0:
                 img = uniform_filter(img*r**2, r)

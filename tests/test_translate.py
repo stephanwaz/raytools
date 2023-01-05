@@ -122,7 +122,7 @@ def test_view2xyz():
     res = 200
     v = ViewMapper(dxyz=dxyz, viewangle=va)
     vwrays = 'vwrays -vta -vv {} -vh {} -vd {} {} {} -vu 0 0 1 -x {} -y {}'.format(va, va, *dxyz, res, res)
-    vrays = np.fromstring(cst.pipeline([vwrays]), sep=' ').reshape(res, res, 6)[-1::-1, -1::-1, 3:]
+    vrays = np.fromstring(cst.pipeline([vwrays]), sep=' ').reshape(res, res, 6)[-1::-1, :, 3:]
     xyz = v.pixelrays(res)
     xyz = np.swapaxes(xyz, 0, 1)
     assert np.allclose(xyz, vrays, rtol=.01, atol=.01)

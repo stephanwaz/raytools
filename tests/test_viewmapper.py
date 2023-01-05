@@ -86,21 +86,21 @@ def test_idx2uv():
 
 def test_image():
     vm = ViewMapper()
-    img, vecs, mask, mask2, header = vm.init_img(10, (0, 1, 2), features=1)
+    img, vecs, mask, mask2, header = vm.init_img(11, (0, 1, 2), features=1)
     assert header == "VIEW= -vta -vv 180 -vh 180 -vd 0.0 1.0 0.0 -vp 0 1 2 -vu 0 0 1"
     avecs = translate.norm(np.array(((0, -1, 1), (0, 1, 1))))
     img = vm.add_vecs_to_img(img, avecs, mask=mask)
     img[mask] += 1
-    assert np.isclose(np.sum(img), 162)
-    assert np.allclose(2, img[(4, 15), (7,7)])
+    assert np.isclose(np.sum(img), 196)
+    assert np.allclose(2, img[(5, 16), (8,8)])
     vm = ViewMapper(viewangle=180)
-    img, vecs, mask, mask2, header = vm.init_img(10, features=3)
+    img, vecs, mask, mask2, header = vm.init_img(11, features=3)
     img = vm.add_vecs_to_img(img, avecs, grow=1)
     assert np.isclose(np.sum(img), 9)
-    assert np.isclose(np.sum(img[0, 3:6, 6:9]), 9)
-    img, vecs, mask, mask2, header = vm.init_img(10)
+    assert np.isclose(np.sum(img[0, 4:7, 7:10]), 9)
+    img, vecs, mask, mask2, header = vm.init_img(11)
     img = vm.add_vecs_to_img(img, avecs, fisheye=False)
-    assert img[4, 7] > 0
+    assert img[5, 8] > 0
 
 
 def test_mapper():
