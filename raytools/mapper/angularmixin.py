@@ -26,7 +26,7 @@ class AngularMixin(object):
     """
 
     _flipu = False
-    _xsign = -1
+    _xsign = 1
 
     def xyz2uv(self, xyz):
         """transform from world xyz space to mapper UV space"""
