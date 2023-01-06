@@ -10,6 +10,8 @@
 
 """The setup script."""
 import sys
+import shutil
+import os
 from glob import glob
 
 from setuptools import find_packages, setup
@@ -27,11 +29,17 @@ setup_requirements = ["setuptools", "wheel"]
 test_requirements = ['pytest', 'pytest-cov']
 
 if sys.platform.startswith('darwin'):
-    data_files = [('bin', glob('radiance_depend/macos/*'))]
+    radexec = glob('radiance_depend/macos/*')
 else:
-    data_files = [('bin', glob('radiance_depend/linux/*'))]
+    radexec = glob('radiance_depend/linux/*')
 
-
+radexec = [rade for rade in radexec if
+           shutil.which(os.path.basename(rade)) is None]
+if len(radexec) > 0:
+    data_files = [('bin', radexec)]
+else:
+    data_files = []
+print(data_files, file=sys.stderr)
 package_data = {"raytools": ["cal/*.cal"]}
 
 setup(

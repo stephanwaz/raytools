@@ -35,15 +35,11 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then
             fi
             make clean
             python setup.py sdist
-            pip wheel . --no-deps -w dist/
             make coverall
             echo -n "ok to push (y/n)? "
             read -r answer
             if [ "$answer" != "${answer#[Yy]}" ] ;then
                 twine upload dist/*.tar.gz
-                git push
-                git checkout master
-                git merge release
                 git push
                 tag="$(git tag | tail -1)"
                 git push origin $tag

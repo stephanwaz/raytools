@@ -40,6 +40,7 @@ def main(ctx, config=None, n=None,  **kwargs):
     ctx.info_name = 'raytools'
     clk.get_config(ctx, config, None, None, None)
 
+
 @main.command()
 @click.argument("imgs", callback=clk.are_files)
 @click.option("-metrics", callback=clk.split_str, default="illum dgp ugp",
