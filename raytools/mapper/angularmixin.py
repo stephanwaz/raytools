@@ -52,16 +52,26 @@ class AngularMixin(object):
 
     def xyz2vxy(self, xyz):
         """transform from world xyz to view image space (2d)"""
-        rxyz = self.world2view(np.atleast_2d(xyz))
-        xy = (translate.xyz2xy(rxyz, flip=self._flipu) * 180 /
-              (self.viewangle * self._chordfactor))
-        return xy/2 + .5
+        xyz = np.atleast_2d(xyz)
+        rxyz = self.world2view(xyz)
+        if self.aspect == 2:
+            mask = self.in_view(xyz, False)
+            nmask = np.logical_not(mask)
+            xy = np.zeros((len(mask), 2))
+            xy[mask] = (translate.xyz2xy(rxyz[mask], flip=self._flipu) /
+                        self._chordfactor) / 2 + .5
+            xy[nmask] = self.ivm.xyz2vxy(xyz[nmask]) + [[1, 0]]
+        else:
+            xy = (translate.xyz2xy(rxyz, flip=self._flipu) * 180 /
+                  (self.viewangle * self._chordfactor)) / 2 + .5
+        return xy
 
     def vxy2xyz(self, xy, stackorigin=False):
         """transform from view image space (2d) to world xyz"""
         pxy = np.atleast_2d(xy)
         pxy -= .5
-        pxy *= np.array([self._xsign, 1]) * (self.viewangle * self._chordfactor) / 180
+        pxy *= (np.array([self._xsign, 1]) *
+                (self.viewangle * self._chordfactor) / 180)
         d = np.sqrt(np.sum(np.square(pxy), -1))
         z = np.cos(np.pi*d)
         nperr = np.seterr(all="ignore")
@@ -185,7 +195,10 @@ class AngularMixin(object):
             xp = xp[mask]
             yp = yp[mask]
         else:
-            pa = translate.uv2ij(self.xyz2uv(v[self.in_view(v)]), res)
+            if self.aspect == 2:
+                pa = translate.uv2ij(self.xyz2uv(v), res)
+            else:
+                pa = translate.uv2ij(self.xyz2uv(v[self.in_view(v)]), res)
             xp = pa[:, 0]
             yp = pa[:, 1]
         r = int(grow*2 + 1)
@@ -194,7 +207,6 @@ class AngularMixin(object):
                 channel = channels[0]
             except TypeError:
                 channel = channels
-            print(xp, yp, res, img.shape)
             img[xp, yp] = channel
             if grow > 0:
                 img = uniform_filter(img*r**2, r)
