@@ -39,7 +39,6 @@ if len(radexec) > 0:
     data_files = [('bin', radexec)]
 else:
     data_files = []
-print(data_files, file=sys.stderr)
 package_data = {"raytools": ["cal/*.cal"]}
 
 setup(

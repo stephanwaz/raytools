@@ -138,7 +138,7 @@ def hdr2vm(imgf, vpt=False):
 
 
 def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
-                   blursun=False, blurtol=0.75):
+                   blursun=False, blurtol=0.75, returnall=True):
     """consolidate the brightest pixels represented by v, o, l up into a single
     source, correcting the area while maintaining equal energy
 
@@ -164,6 +164,8 @@ def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
     blurtol: float, optional
         when checking for su visibility this enables an averaging of near peak values
         whick could be an artifact from pfilt. set to 1 to disable.
+    returnall: bool, optional
+        if true, return complete v, o, l. if false, only return peak
 
     Returns
     -------
@@ -220,9 +222,15 @@ def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
             cf = np.atleast_1d(retina.blur_sun(peaka, peakl))[0]
         else:
             cf = 1
-        o = np.concatenate((vol[:, 3], [peaka*cf]))
-        l = np.concatenate((vol[:, 4], [peakl/cf]))
-    return v, o, l
+        pvol = (pv.ravel(), peaka*cf, peakl/cf)
+        o = np.concatenate((vol[:, 3], [pvol[1]]))
+        l = np.concatenate((vol[:, 4], [pvol[2]]))
+    else:
+        pvol = np.zeros(5)
+    if returnall:
+        return v, o, l
+    else:
+        return pvol
 
 
 def imgmetric(imgf, metrics, peakn=False, scale=179, threshold=2000., lowlight=False,
