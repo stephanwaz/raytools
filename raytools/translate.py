@@ -12,7 +12,7 @@
 import numpy as np
 from scipy.ndimage import gaussian_filter, uniform_filter
 from scipy.spatial import cKDTree
-
+from scipy import stats
 
 def norm(v):
     """normalize 2D array of vectors along last dimension"""
@@ -395,6 +395,173 @@ def resample(samps, ts=None, gauss=True, radius=None):
             samps = uniform_filter(samps, int(radius))
     return samps
 
+####################################
+# 1D non-uniform signal processing #
+####################################
+
+
+def weighted_quantile(d, weights=None, q=0.5, t=0.0):
+    """calculate weighted quantiles on 1d data
+
+    Parameters
+    ----------
+    d : np.array
+        data (flattens array)
+    q : np.array
+        quantiles (N,)
+    weights : np.array
+        weights
+    t : float
+        threshold for inclusion
+
+    Returns
+    -------
+    result : np.array
+        shape (N,)
+
+    """
+    if weights is None:
+        return np.quantile(d, q)
+    else:
+        d = np.asarray(d).ravel()
+        si = np.argsort(d)
+        d = d[si]
+        w = np.asarray(weights).ravel()[si]
+        d = d[w > t]
+        w = w[w > t]
+        cw = np.cumsum(w)
+        cw = cw - cw[0]
+        midp = np.asarray(q) * cw[-1]
+        li = np.searchsorted(cw, midp, side='right') - 1
+        ri = np.where(np.isclose(q, 1), li, li+1)
+        try:
+            dn = np.where(np.isclose(q, 1), 1, (cw[ri] - cw[li]))
+        except IndexError as ex:
+            result = np.quantile(d, q)
+        else:
+            result = d[li] + (d[ri] - d[li]) * (midp - cw[li])/dn
+        return result
+
+
+def weighted_median(d, weights=None, t=0.0):
+    """convinience function with different signature"""
+    return weighted_quantile(d, q=.5, weights=weights, t=t)
+
+
+def non_uniform_gaussian_filter(x, y, xr=None, sigma=None, sscale=1.0,
+                                bw=500, amethod='mean'):
+    """apply a guassian filter to non-uniformly spaced data
+
+    Parameters
+    ----------
+    x : np.array
+        1d source data (N,)
+    y : np.array
+        data to smooth (M,N)
+    xr : np.array
+        coordinates along x to resample (R,). if none, uses x directly
+    sigma : float
+        if None applies scotts rule (x.size**0.2)
+    sscale : float
+        extra factor to apply to sigma
+    bw : int
+        1/2 bandwidth for kernel (in # of samples) use for N > 10000
+    amethod : Union[str, np.array]
+        averaging method, can be 'mean', 'median', or array like of quantiles. if more
+        than one quantile y must contain only one feature
+
+    Returns
+    -------
+    mu : np.array
+        shape (M,), or (R,) if resample
+    """
+    if amethod == 'mean':
+        afunc = np.average
+        akwargs = dict(axis=1)
+    elif amethod == 'median':
+        afunc = weighted_median
+        akwargs = {}
+    else:
+        try:
+            q = np.atleast_1d(amethod).ravel().astype(float)
+        except (TypeError, ValueError):
+            raise ValueError(f"'{amethod}' is not a valid option, must be "
+                             f"'mean' or array-like of quantiles")
+        if not np.all((q >= 0) & (q <= 1)):
+            raise ValueError(f"quantiles must all be in [0,1] not {q}")
+        if y.size > max(y.shape) and len(q) > 1:
+            raise ValueError(f"y must only have one dimension when calculating "
+                             f"more than 1 quantile")
+        afunc = weighted_quantile
+        akwargs = dict(q=q)
+
+    def _nugf_x(x0, xp, yp, sp):
+        """average yp spaced by xp at x0 for a sigma=sp"""
+        n = stats.norm(loc=x0, scale=sp)
+        weights = n.pdf(xp)
+        if np.sum(weights) > 0:
+            mu = afunc(yp, weights=weights, **akwargs)
+        else:
+            # fall back to linear interpolation
+            mui = np.searchsorted(xp, x0)[0]
+            if mui == len(xp):
+                mu = yp[:, -1]
+            elif mui == 0:
+                mu = yp[:, 0]
+            else:
+                mu = np.average((yp[:, mui], yp[:, mui-1]), axis=0,
+                                weights=(x0-xp[mui-1], xp[mui]-x0))
+            if 'q' in akwargs:
+                mu = np.full(len(akwargs['q']), mu)
+        return mu
+
+    def _nugf_i(i, xp, yp, sp):
+        """average yp spaced by xp at index i for a sigma=sp"""
+        return _nugf_x(xp[i[0]], xp, yp, sp)
+
+    def _nugf_x_bw(x0, xp, yp, sp):
+        """average yp spaced by xp at x0 for a sigma=sp with limited
+        bandwidth"""
+        i = np.searchsorted(xp, x0)
+        i2 = np.clip((i - bw, i + bw), 0, len(xp)).astype(int).ravel()
+        return _nugf_x(x0, xp[i2[0]:i2[1]], yp[:, i2[0]:i2[1]], sp)
+
+    def _nugf_i_bw(i, xp, yp, sp):
+        """average yp spaced by xp at index i for a sigma=sp with limited
+        bandwidth"""
+        i2 = np.clip((i - bw, i + bw), 0, len(xp)).astype(int).ravel()
+        return _nugf_x(xp[i], xp[i2[0]:i2[1]], yp[:, i2[0]:i2[1]], sp)
+
+    y = np.atleast_2d(y)
+    # sort data if necessary
+    if not np.all(x[:-1] <= x[1:]):
+        sorti = np.argsort(x, kind='stable')
+        x = x[sorti]
+        y = y[:, sorti]
+        inv_sort = np.argsort(sorti, kind='stable')
+    else:
+        inv_sort = None
+    if sigma is None:
+        sigma = np.sqrt(np.cov(x) * len(x) ** (-.4))
+    sigma *= sscale
+    if bw is None and xr is None:  # no bandwidth and self
+        nugf = _nugf_i
+        idxs = np.arange(x.size)
+    elif bw is None:  # no bandwidth, resample
+        nugf = _nugf_x
+        idxs = xr
+    elif xr is None:  # bandwidth on self
+        nugf = _nugf_i_bw
+        idxs = np.arange(x.size)
+    else:  # bandwidth on resample
+        nugf = _nugf_x_bw
+        idxs = xr
+    amu = np.apply_along_axis(nugf, 0, idxs.reshape(1, -1), x, y, sigma)
+    # sort back unless already sorted or resampled
+    if inv_sort is not None and resample is None:
+        amu = amu[inv_sort]
+    return amu
+
 
 ####################
 # vector rotations #
@@ -414,7 +581,7 @@ def rotate_elem(v, theta, axis=2, degrees=True):
     return np.einsum('ij,kj->ki', rmtx, v)
 
 
-def rmtx_yp(v):
+def rmtx_yp(v, keepdims=False):
     """generate a pair of rotation matrices to transform from vector v to
     z, enforcing a z-up in the source space and a y-up in the destination. If
     v is z, returns pair of identity matrices, if v is -z returns pair of 180
@@ -468,6 +635,9 @@ def rmtx_yp(v):
     pmtx = np.stack(((o, z, z), (z, cp, sp), (z, -sp, cp))).T
     pmtx[e] = np.eye(3)
     pmtx[ne] = np.array([(1, 0, 0), (0, -1, 0), (0, 0, -1)])
+
+    if keepdims:
+        return ymtx, pmtx
 
     return np.squeeze(ymtx), np.squeeze(pmtx)
 

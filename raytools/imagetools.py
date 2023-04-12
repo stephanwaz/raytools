@@ -18,25 +18,29 @@ from raytools.mapper.viewmapper import ViewMapper
 
 
 def array_uv2ang(imarray):
-    res = imarray.shape[-1]
-    vm = ViewMapper(viewangle=180)
-    pixelxyz = vm.pixelrays(res)
-    uv = vm.xyz2uv(pixelxyz.reshape(-1, 3))
-    mask = vm.in_view(pixelxyz, indices=False)
-    ij = translate.uv2ij(uv[mask], res)
-    if len(imarray.shape) == 3:
-        img = np.zeros((3, res*res))
-        img[:, mask] = imarray[:, ij[:, 0], ij[:, 1]]
-        return img.reshape(3, res, res)
+    resx = imarray.shape[-2]
+    resy = imarray.shape[-1]
+    if resx > resy:
+        vm = ViewMapper(viewangle=360)
     else:
-        img = np.zeros(res*res)
+        vm = ViewMapper(viewangle=180)
+    img, pixelxyz, mask, _, _ = vm.init_img(resy, features=len(imarray.shape), indices=False)
+    uv = vm.xyz2uv(pixelxyz.reshape(-1, 3))
+    ij = translate.uv2ij(uv[mask], resy)
+    if len(imarray.shape) == 3:
+        img = np.zeros((3, resx*resy))
+        img[:, mask] = imarray[:, ij[:, 0], ij[:, 1]]
+        return img.reshape(3, resx, resy)
+    else:
+        img = np.zeros(resx*resy)
         img[mask] = imarray[ij[:, 0], ij[:, 1]]
-        return img.reshape(res, res)
+        return img.reshape(resx, resy)
 
 
-def hdr_uv2ang(imgf, **kwargs):
+def hdr_uv2ang(imgf, outf=None, **kwargs):
+    if outf is None:
+        outf = imgf.rsplit(".", 1)[0] + "_ang.hdr"
     imarray = io.hdr2carray(imgf)
-    outf = imgf.rsplit(".", 1)[0] + "_ang.hdr"
     img = array_uv2ang(imarray)
     io.carray2hdr(img, outf)
     return outf
@@ -55,14 +59,15 @@ def array_ang2uv(imarray, vm=None):
         return imarray[pxy[:, 0], pxy[:, 1]].reshape(res, res)
 
 
-def hdr_ang2uv(imgf, useview=True):
+def hdr_ang2uv(imgf, useview=True, outf=None):
+    if outf is None:
+        outf = imgf.rsplit(".", 1)[0] + "_uv.hdr"
     vm = None
     if useview:
         vm = hdr2vm(imgf)
     if vm is None:
         vm = ViewMapper(viewangle=180)
     imarray = io.hdr2carray(imgf)
-    outf = imgf.rsplit(".", 1)[0] + "_uv.hdr"
     img = array_ang2uv(imarray, vm)
     io.carray2hdr(img, outf)
     return outf
@@ -87,6 +92,18 @@ def vf_to_vm(view):
     vd = vp.index("-vd")
     view_dir = [float(vp[i]) for i in range(vd + 1, vd + 4)]
     return ViewMapper(view_dir, view_angle)
+
+
+def img_size(imgf):
+    hd = cst.pipeline([f"getinfo -d {imgf}"]).strip().split()
+    x = 1
+    y = 1
+    for i in range(2, len(hd)):
+        if 'X' in hd[i - 1]:
+            x = int(hd[i])
+        elif 'Y' in hd[i - 1]:
+            y = int(hd[i])
+    return x, y
 
 
 def hdr2vm(imgf, vpt=False):
@@ -119,14 +136,7 @@ def hdr2vm(imgf, vpt=False):
             view_pt = [0.0, 0.0, 0.0]
         else:
             view_pt = [float(vp[i]) for i in range(vpi + 1, vpi + 4)]
-        hd = cst.pipeline([f"getinfo -d {imgf}"]).strip().split()
-        x = 1
-        y = 1
-        for i in range(2, len(hd)):
-            if 'X' in hd[i - 1]:
-                x = float(hd[i])
-            elif 'Y' in hd[i - 1]:
-                y = float(hd[i])
+        x, y = img_size(imgf)
         vm = ViewMapper(view_dir, view_angle * x / y)
     else:
         view_pt = None

@@ -118,15 +118,28 @@ class AngularMixin(object):
         else:
             return mask
 
-    def header(self, pt=(0, 0, 0), **kwargs):
+    def header(self, pt=(0, 0, 0), viewproj='vta', **kwargs):
         if np.allclose(self.dxyz, (0, 0, 1)):
             vup = "0 1 0"
         else:
             vup = "0 0 1"
-        return ('VIEW= -vta -vv {0} -vh {0} -vd {1} {2} {3} -vp {4} {5} '
-                '{6} -vu {7}'.format(self.viewangle, *self.dxyz, *pt, vup))
+        return ('VIEW= -{8} -vv {0} -vh {0} -vd {1} {2} {3} -vp {4} {5} '
+                '{6} -vu {7}'.format(self.viewangle, *self.dxyz, *pt, vup,
+                                     viewproj))
 
-    def init_img(self, res=512, pt=(0, 0, 0), features=1, **kwargs):
+    @staticmethod
+    def _process_viewproj(a):
+        a = a.lower()
+        if a[0:2] == 'vt':
+            a = a[-1]
+        a = a[0]
+        if a in ('a', 'f'):  # angular fisheye
+            return 'vta'
+        else:  # Shirley-Chiu square/rectangle
+            return 'vuv'
+
+    def init_img(self, res=512, pt=(0, 0, 0), features=1, viewproj='vta', indices=True,
+                 **kwargs):
         """Initialize an image array with vectors and mask
 
         Parameters
@@ -135,6 +148,13 @@ class AngularMixin(object):
             image array resolution
         pt: tuple, optional
             view point for image header
+        features: int, optional
+            when greater than 1 initialize img array with N output channels
+        viewproj: str, optional
+            output view projection chose from::
+
+                angular: '[Aa]*', 'vta', 'fish*'
+                shirley chiu: '[Uu]*', 'square'
 
         Returns
         -------
@@ -148,24 +168,35 @@ class AngularMixin(object):
             if features > 1, use mask 2 fro color images
         header: str
         """
+        viewproj = self._process_viewproj(viewproj)
         if features > 1:
-            img = np.zeros((features, res*self.aspect, res))
+            img = np.zeros((features, res * self.aspect, res))
         else:
-            img = np.zeros((res*self.aspect, res))
-        vecs = self.pixelrays(res)
-        if self.aspect == 2:
-            mask = self.in_view(vecs[0:res])
-            mask2 = self.ivm.in_view(vecs[res:])
-            mask = (np.concatenate((mask[0], mask2[0] + res)),
-                    np.concatenate((mask[1], mask2[1])))
+            img = np.zeros((res * self.aspect, res))
+        header = self.header(pt, viewproj=viewproj, **kwargs)
+        mask = None
+        mask2 = None
+        if viewproj == 'vta':
+            vecs = self.pixelrays(res)
+            if self.aspect == 2:
+                mask = self.in_view(vecs[0:res], indices=indices)
+                mask2 = self.ivm.in_view(vecs[res:], indices=indices)
+                if indices:
+                    mask = (np.concatenate((mask[0], mask2[0] + res)),
+                            np.concatenate((mask[1], mask2[1])))
+                else:
+                    mask = np.concatenate((mask, mask2))
+            else:
+                mask = self.in_view(vecs, indices=indices)
+
+            if features > 1 and indices:
+                mask2 = (np.tile(np.arange(features), len(mask[0])),
+                         np.repeat(mask[0], features), np.repeat(mask[1], features))
+            else:
+                mask2 = mask
         else:
-            mask = self.in_view(vecs)
-        header = self.header(pt, **kwargs)
-        if features > 1:
-            mask2 = (np.tile(np.arange(features), len(mask[0])),
-                     np.repeat(mask[0], features), np.repeat(mask[1], features))
-        else:
-            mask2 = mask
+            uv = translate.bin2uv(np.arange(res * res * self.aspect), res)
+            vecs = self.uv2xyz(uv).reshape(self.aspect * res, res, 3)
         return img, vecs, mask, mask2, header
 
     def add_vecs_to_img(self, img, v, channels=(1, 0, 0), grow=0, fisheye=True,
