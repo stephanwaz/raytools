@@ -47,7 +47,7 @@ class PositionIndex(object):
         return self._positions(wvec, sigma)
 
     def _positions(self, vec, sigma):
-        vip = self._to_plane(np.array((0, 0, 1)), vec)
+        vip = self._to_plane(vec)
         #: tau: angle between vertical and source projected to view plane
         tau = self._angle_vv(np.array((0, 1, 0)), vip)*180/np.pi
         if self.guth:
@@ -74,16 +74,15 @@ class PositionIndex(object):
         return self.positions(vm, srcvec)
 
     @staticmethod
-    def _to_plane(n, vec):
-        nv = n.reshape(-1, 3)
-        proj = vec[None] - np.tensordot(nv, vec,
-                                        (-1, -1))[..., None] * nv[:, None, :]
-        proj = proj/np.linalg.norm(proj, axis=-1)[..., None]
+    def _to_plane(vec):
+        proj = np.copy(vec)
+        proj[:, 2] = 0
+        proj = proj[None]/np.linalg.norm(proj[None], axis=-1)[..., None]
         return proj
 
     @staticmethod
     def _angle_vv(a, b):
-        return np.arccos(np.tensordot(a, b, (-1, -1)))
+        return np.arccos(np.einsum("i,jki->jk", a, b))
 
     @staticmethod
     def _get_pidx_guth(sigma, tau):

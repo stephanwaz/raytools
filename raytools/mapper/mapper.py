@@ -29,7 +29,8 @@ class Mapper(object):
     """
 
     def __init__(self, dxyz=(0.0, 0.0, 1.0), sf=(1, 1), bbox=((0, 0), (1, 1)),
-                 aspect=None, name='mapper', origin=(0, 0, 0), jitterrate=1.0):
+                 aspect=None, name='mapper', origin=(0, 0, 0), jitterrate=1.0,
+                 uvz=0.0):
         self._sf = np.asarray(sf).flatten()
         self._bbox = np.asarray(bbox).reshape(2, 2)
         self.name = name
@@ -37,6 +38,7 @@ class Mapper(object):
         self.dxyz = dxyz
         self.origin = origin
         self.jitterrate = jitterrate
+        self._uvz = uvz
 
     @property
     def aspect(self):
@@ -90,7 +92,7 @@ class Mapper(object):
     def uv2xyz(self, uv, stackorigin=False):
         """transform from mapper UV space to world xyz"""
         uv = self.bbox[None, 0] + np.reshape(uv, (-1, 2))*self._sf[None, :]
-        xyz = self.view2world(np.hstack((uv, np.zeros((len(uv), 1)))))
+        xyz = self.view2world(np.hstack((uv, np.full((len(uv), 1), self._uvz))))
         if stackorigin:
             xyz = np.hstack((np.broadcast_to(self.origin, xyz.shape), xyz))
         return xyz

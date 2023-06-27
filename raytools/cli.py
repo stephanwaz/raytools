@@ -13,10 +13,11 @@ import numpy as np
 
 from clasp import click
 import clasp.click_ext as clk
+from scipy import stats
 
 import raytools
 from raytools.utility import pool_call
-from raytools import imagetools
+from raytools import imagetools, translate
 from raytools.evaluate import hvsgsm
 
 
@@ -135,16 +136,73 @@ def metric(ctx, imgs, metrics=None, parallel=True, peakn=False,
 @click.option("--useview/--no-useview", default=True,
               help="use view direction for transform ang2uv to match standard"
                    "projection")
+@click.option("-rotate", default=0.0,
+              help="degrees to rotate img (overrides projection, "
+                   "assumes angular fisheye input)")
+@click.option("-center", default=None, callback=clk.split_int,
+              help="new image center give as pixel 'x y' (overrides projection,"
+                   "assumes angular fisheye input)")
+@click.option("--rotate-first/--center-first", default=True,
+              help="order to apply rotation and centering")
 @clk.shared_decs(clk.command_decs(raytools.__version__, wrap=True))
-def project(ctx, img, uv2ang=False, useview=True, **kwargs):
+def project(ctx, img, uv2ang=False, useview=True, rotate=0.0, center=None, rotate_first=True, **kwargs):
     """project images between angular and shirley-chiu square coordinates"""
-    if uv2ang:
+    if rotate != 0 or center is not None:
+        func = imagetools.hdr_rotate
+    elif uv2ang:
         func = imagetools.hdr_uv2ang
     else:
         func = imagetools.hdr_ang2uv
-    results = pool_call(func, img, expandarg=False, useview=useview)
+    results = pool_call(func, img, expandarg=False, useview=useview,
+                        rotate=rotate, center=center, rotate_first=rotate_first)
     print("Wrote the Following image files:", file=sys.stderr)
     print("\n".join(results), file=sys.stderr)
+
+
+@main.command()
+@click.argument("dataf", callback=clk.is_file)
+@click.option("-x", default=0,
+              help="column index for x coord")
+@click.option("-x_out", default="1000", callback=clk.split_float,
+              help="give as a single value to resample between max and min, "
+                   "or specify own range")
+@click.option("-y", default=None, callback=clk.split_int,
+              help="column index(es) for y coord(s), if none, returns KDE of x")
+@click.option("-sigma", default=None, type=float,
+              help="if None applies scotts rule (x.size**0.2)")
+@click.option("-sf", default=1.0,
+              help="scale factor for sigma")
+@clk.shared_decs(clk.command_decs(raytools.__version__, wrap=True))
+def smooth(ctx, dataf, x=0, x_out=(1000.0,), y=(-1,), sigma=None, sf=1.0,
+           **kwargs):
+    if y is None:
+        y = []
+    data = np.loadtxt(dataf)
+    if len(data.shape) == 1:
+        data = data[:, None]
+    dx = data[:, x]
+    dy = data[:, y].T
+    if len(x_out) == 1:
+        x_out = np.linspace(np.min(dx), np.max(dx), int(x_out[0]))
+    if sigma is None:
+        sigma = np.sqrt(np.cov(dx) * len(dx) ** (-.4))
+    sigma *= sf
+    if dx.size > 10000:
+        bw = 500
+    else:
+        bw = None
+    if dy.size == 0:
+        k = stats.gaussian_kde(dx, bw_method=sigma)
+        y_out = k(x_out)[None]
+    else:
+        y_out = translate.non_uniform_gaussian_filter(dx, dy, x_out,
+                                                      sigma=sigma,
+                                                      bw=bw)
+    for x, yo in zip(x_out, y_out.T):
+        print(x, *yo)
+
+
+
 
 
 @main.result_callback()

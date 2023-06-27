@@ -208,9 +208,9 @@ def skybin2xyz(bn, side):
     return xyz
 
 
-##################################################
-# Translate to/from anglular fisheye projeection #
-##################################################
+################################################
+# Translate to/from angular fisheye projection #
+################################################
 
 def xyz2xy(xyz, axes=(0, 1, 2), flip=False):
     """xyz coordinates to xy mapping of angular fisheye proejection"""
@@ -225,9 +225,9 @@ def xyz2xy(xyz, axes=(0, 1, 2), flip=False):
     return np.stack((x, y)).T
 
 
-##########################################
-# Translate to/from anglular coordinates #
-##########################################
+#########################################
+# Translate to/from angular coordinates #
+#########################################
 
 def tpnorm(thetaphi):
     """normalize angular vector to 0-pi, 0-2pi"""
@@ -475,10 +475,10 @@ def non_uniform_gaussian_filter(x, y, xr=None, sigma=None, sscale=1.0,
     mu : np.array
         shape (M,), or (R,) if resample
     """
-    if amethod == 'mean':
+    if type(amethod) == str and amethod == 'mean':
         afunc = np.average
         akwargs = dict(axis=1)
-    elif amethod == 'median':
+    elif type(amethod) == str and amethod == 'median':
         afunc = weighted_median
         akwargs = {}
     else:

@@ -15,6 +15,7 @@ import clasp.script_tools as cst
 from raytools import translate, io
 from raytools.evaluate import MetricSet, retina
 from raytools.mapper.viewmapper import ViewMapper
+from scipy.interpolate import RegularGridInterpolator
 
 
 def array_uv2ang(imarray):
@@ -59,7 +60,7 @@ def array_ang2uv(imarray, vm=None):
         return imarray[pxy[:, 0], pxy[:, 1]].reshape(res, res)
 
 
-def hdr_ang2uv(imgf, useview=True, outf=None):
+def hdr_ang2uv(imgf, useview=True, outf=None, **kwargs):
     if outf is None:
         outf = imgf.rsplit(".", 1)[0] + "_uv.hdr"
     vm = None
@@ -73,13 +74,67 @@ def hdr_ang2uv(imgf, useview=True, outf=None):
     return outf
 
 
-def hdr2vol(imgf, vm=None):
-    ar = io.hdr2array(imgf)
+def array_rotate(imarray, ang, center=None, rotate_first=True):
+    res = imarray.shape[-1]
+    vm = ViewMapper(viewangle=180)
+    features = 1
+    if len(imarray.shape) == 3:
+        features = 3
+    img, pxyz, mask, mask2, _ = vm.init_img(res, features=features,
+                                            indices=False)
+
+    pxyz = pxyz.reshape(-1, 3)
+    if rotate_first and ang != 0:
+        pxyz = translate.rotate_elem(pxyz, ang, 1)
+    if center is not None:
+        cxyz = vm.pixel2ray(np.atleast_2d(center)[:, 0:2], res)
+        vm2 = ViewMapper(dxyz=cxyz[0], viewangle=180)
+        pxyz = vm2.view2world(vm.world2view(pxyz))
+    if (not rotate_first) and ang != 0:
+        pxyz = translate.rotate_elem(pxyz, ang, 1)
+
+    pxy = vm.ray2pixel(pxyz, res, integer=False)
+    x = np.arange(res)
+    if len(imarray.shape) == 3:
+        for i in range(3):
+            instance = RegularGridInterpolator((x, x), imarray[i],
+                                               bounds_error=False,
+                                               method='linear', fill_value=0)
+            img[i].flat = instance(pxy).T.ravel()
+    else:
+        instance = RegularGridInterpolator((x, x), imarray, bounds_error=False,
+                                           method='linear', fill_value=0)
+        img.flat = instance(pxy)
+    return img
+
+
+def hdr_rotate(imgf, outf=None, rotate=0.0, center=None, rotate_first=True, **kwargs):
+    cl = ""
+    rl = ""
+    if rotate_first and rotate != 0:
+        cl += f"_r{int(rotate):02d}"
+    if center is not None:
+        cl += f"_{center[0]}-{center[1]}"
+    if (not rotate_first) and rotate != 0:
+        cl += f"_r{int(rotate):02d}"
+    if outf is None:
+        outf = imgf.rsplit(".", 1)[0] + f"{cl}.hdr"
+    imarray = io.hdr2carray(imgf)
+    img = array_rotate(imarray, rotate, center, rotate_first=rotate_first)
+    io.carray2hdr(img, outf)
+    return outf
+
+
+def hdr2vol(imgf, vm=None, color=False):
+    if color:
+        ar = io.hdr2carray(imgf)
+    else:
+        ar = io.hdr2array(imgf)
     if vm is None:
         vm = hdr2vm(imgf)
     vecs = vm.pixelrays(ar.shape[-1]).reshape(-1, 3)
     oga = vm.pixel2omega(vm.pixels(ar.shape[-1]), ar.shape[-1]).ravel()
-    return vecs, oga, ar.ravel()
+    return vecs, oga, np.squeeze(ar.reshape(-1, ar.shape[-1]*ar.shape[-2]))
 
 
 def vf_to_vm(view):
@@ -147,8 +202,83 @@ def hdr2vm(imgf, vpt=False):
         return vm
 
 
+def gather_strays(pvol, peakt, cosrad):
+    pc = np.nonzero(pvol[:, -1] > peakt)[0]
+    # only do something if some pixels above peakt
+    if pc.size > 3:
+        # first sort descending by luminance
+        pc = pc[np.argsort(-pvol[pc, -1])]
+        pvols = pvol[pc]
+        # calculate angular distance from peak ray and filter strays
+        pd = np.einsum("i,ji->j", pvols[0, 0:3], pvols[:, 0:3])
+        dm = pd > cosrad
+        strays = [(np.average(pvols[dm, 0:3], axis=0), np.sum(pvols[dm, 3]), np.average(pvols[dm, 4], weights=pvols[dm, 3]))]
+        return strays + gather_strays(pvols[np.logical_not(dm)], peakt, cosrad)
+    else:
+        return []
+
+
+def find_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
+              blurtol=0.75, peakc=1.0, peakrad=4.0, findsecondary=False, blursun=False):
+    pc = np.nonzero(l > peakt / scale)[0]
+    # only do something if some pixels above peakt
+    if pc.size == 0:
+        return None, None, pc
+    # first sort descending by luminance
+    pc = pc[np.argsort(-l[pc])]
+    pvol = np.hstack((v[pc], o[pc, None], l[pc, None]))
+    # establish maximum radius for grouping
+    cosrad = np.cos((peaka / np.pi) ** .5 * peakrad)
+    # calculate angular distance from peak ray and filter strays
+    pd = np.einsum("i,ji->j", pvol[0, 0:3], pvol[:, 0:3])
+    dm = pd > cosrad
+    pc = pc[dm]
+
+    if findsecondary:
+        tol2 = np.cos((peaka / np.pi) ** .5 * peakrad * 8)
+        strays = gather_strays(pvol[pd < tol2], peakt * 4 / scale, tol2)
+    else:
+        strays = None
+
+    pvol = pvol[dm]
+    # this handles image filtering/blurring
+    nearpeak = pvol[0, 4] * blurtol <= pvol[:, 4]
+    # calculate expected energy assuming full visibility:
+    esun = np.average(pvol[nearpeak, 4]) * peaka * peakc
+    # sum up to peak energy
+    cume = np.cumsum(pvol[:, 3] * pvol[:, 4])
+    # when there is enough energy, treat as full sun
+    if cume[-1] > esun:
+        stop = np.argmax(cume > esun)
+        if stop == 0:
+            stop = len(cume)
+        peakl = cume[stop - 1] / peaka
+    # otherwise treat as partial sun (needs to use peak ratio)
+    else:
+        stop = np.argmax(pvol[:, 4] < pvol[0, 4] / peakr)
+        if stop == 0:
+            stop = len(cume)
+        if peakc > 1:
+            peakl = cume[stop - 1] / peaka
+        else:
+            peakl = pvol[0, 4]
+            peaka = cume[stop - 1] / peakl
+    pc = pc[:stop]
+    pvol = pvol[:stop]
+    # new source vector weight by L*omega of source rarys
+    pv = translate.norm(np.average(pvol[:, 0:3], axis=0, weights=pvol[:, 3] *
+                                                                 pvol[:, 4]))
+    if blursun:
+        cf = np.atleast_1d(retina.blur_sun(peaka, peakl))[0]
+    else:
+        cf = 1
+    pvol = (pv.ravel(), peaka * cf, peakl / cf)
+    return pvol, strays, pc
+
+
 def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
-                   blursun=False, blurtol=0.75, returnall=True):
+                   blursun=False, blurtol=0.75, returnall=True, peakc=1.0,
+                   peakrad=4.0, returnparts=False, keepzeros=False, findsecondary=False):
     """consolidate the brightest pixels represented by v, o, l up into a single
     source, correcting the area while maintaining equal energy
 
@@ -169,6 +299,10 @@ def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
     peakr: Union[float, int], optional
         ratio, from peak pixel value to lowest value to include when aggregating
         partially visible sun.
+    peakc: float, optional
+        correct peak value for expected energy (use with photos)
+    peakrad: float, optional
+        distance tolerance (as factor of radius) for peak pixel collection
     blursun: bool, optional
         whether to correct area and luminance according to human PSF
     blurtol: float, optional
@@ -176,9 +310,14 @@ def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
         whick could be an artifact from pfilt. set to 1 to disable.
     returnall: bool, optional
         if true, return complete v, o, l. if false, only return peak
+    returnparts: bool, optional
+        supercedes return all, return pvol, v, o, l
+    keepzeros: bool, optional
+        zero at lums of source rays, but keep in return value
 
     Returns
     -------
+    pvol: tuple
     v: np.array
         shape (N, 3), direction vectors of pixels (x, y, z) normalized
     o: np.array
@@ -187,58 +326,41 @@ def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
         shape (N,), luminance of pixels
 
     """
-    pc = np.nonzero(l > peakt / scale)[0]
+    pvol, strays, pc = find_peak(v, o, l, scale=scale, peaka=peaka, peakt=peakt,
+                                 peakr=peakr, blurtol=blurtol, peakc=peakc,
+                                 peakrad=peakrad, findsecondary=findsecondary,
+                                 blursun=blursun)
     # only do something if some pixels above peakt
     if pc.size > 0:
-        # first sort descending by luminance
-        pc = pc[np.argsort(-l[pc])]
-        pvol = np.hstack((v[pc], o[pc, None], l[pc, None]))
-        # establish maximum radius for grouping
-        cosrad = np.cos((peaka/np.pi)**.5*4)
-        # calculate angular distance from peak ray and filter strays
-        pd = np.einsum("i,ji->j", pvol[0, 0:3], pvol[:, 0:3])
-        dm = pd > cosrad
-        pc = pc[dm]
-        pvol = pvol[dm]
-        # this handles image filtering/bluring
-        nearpeak = pvol[0, 4] * blurtol <= pvol[:, 4]
-        # calculate expected energy assuming full visibility:
-        esun = np.average(pvol[nearpeak, 4])*peaka
-        # sum up to peak energy
-        cume = np.cumsum(pvol[:, 3]*pvol[:, 4])
-        # when there is enough energy, treat as full sun
-        if cume[-1] > esun:
-            stop = np.argmax(cume > esun)
-            if stop == 0:
-                stop = len(cume)
-            peakl = cume[stop - 1]/peaka
-        # otherwise treat as partial sun (needs to use peak ratio)
+        lum = np.copy(l)
+        omega = np.copy(o)
+        if keepzeros:
+            lum[pc] = 0
+            omega[pc] = 0
+            vol = np.hstack((v, omega[:, None], lum[:, None]))
         else:
-            stop = np.argmax(pvol[:, 4] < pvol[0, 4]/peakr)
-            if stop == 0:
-                stop = len(cume)
-            peakl = pvol[0, 4]
-            peaka = cume[stop - 1]/peakl
-        pc = pc[:stop]
-        pvol = pvol[:stop]
-        # new source vector weight by L*omega of source rarys
-        pv = translate.norm(np.average(pvol[:, 0:3], axis=0,
-                                       weights=pvol[:, 3]*pvol[:, 4]))
-        # filter out source rays
-        vol = np.delete(np.hstack((v, o[:, None], l[:, None])), pc, axis=0)
-        # then add new consolidated ray back to output v, o, l
-        v = np.vstack((vol[:, 0:3], pv))
-        if blursun:
-            cf = np.atleast_1d(retina.blur_sun(peaka, peakl))[0]
+            vol = np.hstack((v, omega[:, None], lum[:, None]))
+            # filter out source rays
+            vol = np.delete(vol, pc, axis=0)
+        if returnparts:
+            v = vol[:, 0:3]
+            omega = vol[:, 3]
+            lum = vol[:, 4]
         else:
-            cf = 1
-        pvol = (pv.ravel(), peaka*cf, peakl/cf)
-        o = np.concatenate((vol[:, 3], [pvol[1]]))
-        l = np.concatenate((vol[:, 4], [pvol[2]]))
+            # then add new consolidated ray back to output v, o, l
+            v = np.vstack((vol[:, 0:3], [pvol[0]]))
+            omega = np.concatenate((vol[:, 3], [pvol[1]]))
+            lum = np.concatenate((vol[:, 4], [pvol[2]]))
     else:
         pvol = np.zeros(5)
-    if returnall:
-        return v, o, l
+        lum = l
+        omega = o
+    if findsecondary:
+        return pvol, strays
+    elif returnparts:
+        return pvol, v, omega, lum
+    elif returnall:
+        return v, omega, lum
     else:
         return pvol
 
