@@ -22,7 +22,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['clasp', 'numpy', 'scipy', 'tqdm']
+requirements = ['clasp', 'numpy', 'scipy', 'tqdm', 'colour-science>=0.4.2']
 
 setup_requirements = ["setuptools", "wheel"]
 

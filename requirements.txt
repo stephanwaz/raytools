@@ -2,3 +2,4 @@ clasp
 numpy
 scipy
 tqdm
+colour~=0.4.2
