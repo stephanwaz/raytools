@@ -74,7 +74,28 @@ def hdr_ang2uv(imgf, useview=True, outf=None, **kwargs):
     return outf
 
 
-def array_rotate(imarray, ang, center=None, rotate_first=True):
+def array_rotate(imarray, ang, center=None, rotate_first=True, fill_value=None):
+    """rotate and center a angular fisheye image array
+
+    Parameters
+    ----------
+    imarray : np.array
+        ([optional 3 color], width, height)
+    ang : float
+        rotation angle in degrees
+    center : tuple, optional
+        new pixel center (in orginal coordinates)
+    rotate_first : bool, optional
+        order of rotate/center. true is rotate first.
+    fill_value : optional
+        passed to scipy.RegularGridInterpolator
+
+    Returns
+    -------
+
+    corrected np.array
+
+    """
     res = imarray.shape[-1]
     vm = ViewMapper(viewangle=180)
     features = 1
@@ -99,11 +120,11 @@ def array_rotate(imarray, ang, center=None, rotate_first=True):
         for i in range(3):
             instance = RegularGridInterpolator((x, x), imarray[i],
                                                bounds_error=False,
-                                               method='linear', fill_value=0)
+                                               method='linear', fill_value=fill_value)
             img[i].flat = instance(pxy).T.ravel()
     else:
         instance = RegularGridInterpolator((x, x), imarray, bounds_error=False,
-                                           method='linear', fill_value=0)
+                                           method='linear', fill_value=fill_value)
         img.flat = instance(pxy)
     return img
 
