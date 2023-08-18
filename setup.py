@@ -22,7 +22,7 @@ with open('README.rst') as readme_file:
 with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
-requirements = ['clasp', 'numpy', 'scipy', 'tqdm', 'colour-science>=0.4.2']
+requirements = ['clasp', 'numpy', 'scipy', 'tqdm']
 
 setup_requirements = ["setuptools", "wheel"]
 
@@ -55,7 +55,7 @@ setup(
         ],
     description="working with hdr images, numpy and coordinate transformations "
                 "for lighting simulation",
-    python_requires=">=3.7",
+    python_requires=">=3.6.8",
     entry_points={
         'console_scripts': ['raytools=raytools.cli:main'],
         },

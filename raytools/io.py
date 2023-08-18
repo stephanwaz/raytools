@@ -8,6 +8,7 @@
 # =======================================================================
 
 """functions for reading and writing"""
+import re
 import shlex
 import os
 from subprocess import Popen, PIPE
@@ -198,7 +199,7 @@ def carray2hdr(ar, imgf, header=None):
     return _array2hdr(ar.T[::-1], imgf, header, pval)
 
 
-def hdr2array(imgf, stdin=None):
+def hdr2array(imgf, stdin=None, header=False):
     """read np.array from hdr image
 
     Parameters
@@ -216,10 +217,13 @@ def hdr2array(imgf, stdin=None):
     p = Popen(shlex.split(pval), stdin=stdin, stdout=PIPE)
     shape = p.stdout.readline().strip().split()
     shape = (int(shape[-3]), int(shape[-1]))
-    return bytes2np(p.stdout.read(), shape).T[:, ::-1]
+    imgd = bytes2np(p.stdout.read(), shape).T[:, ::-1]
+    if header:
+        return imgd, hdr_header(imgf)
+    return imgd
 
 
-def hdr2carray(imgf, stdin=None):
+def hdr2carray(imgf, stdin=None, header=False):
     """read np.array from color hdr image
 
     Parameters
@@ -236,7 +240,28 @@ def hdr2carray(imgf, stdin=None):
     p = Popen(shlex.split(pval), stdin=stdin, stdout=PIPE)
     shape = p.stdout.readline().strip().split()
     shape = (3, int(shape[-3]), int(shape[-1]))
-    return np.transpose(bytes2np(p.stdout.read(), shape)[:, ::-1], (0, 2, 1))
+    imgd = np.transpose(bytes2np(p.stdout.read(), shape)[:, ::-1], (0, 2, 1))
+    if header:
+        return imgd, hdr_header(imgf)
+    return imgd
+
+
+def hdr_header(imgf):
+    p = Popen(shlex.split(f"getinfo {imgf}"), stdout=PIPE, stderr=PIPE).communicate()
+    err = p[1]
+    try:
+        err = err.decode("utf-8")
+    except AttributeError:
+        pass
+    if "bad header!" in err:
+        raise IOError(f"{err} - wrong file type?")
+    try:
+        header = p[0].decode("utf-8")
+    except UnicodeDecodeError:
+        raise IOError(f"{err} - wrong file type?")
+    if "cannot open" in header:
+        raise FileNotFoundError(f"{imgf} not found")
+    return [i for i in header.strip().splitlines() if not re.match(r".*#?RADIANCE.*", i)]
 
 
 def rgb2rad(rgb, vlambda=(0.265, 0.670, 0.065)):

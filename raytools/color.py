@@ -39,7 +39,6 @@ def cam16_to_cam16ucs(cam):
 
 
 def rgb_samples():
-    colour.XYZ_to_hdr_CIELab()
     ca = 2**np.linspace(-2, 6, 64)
     rgb = np.stack(np.broadcast_arrays(ca[None, :, None], ca[None, None], ca[:, None, None])).reshape(3, -1)
     cam = rgb_to_cam16(rgb.T)
@@ -205,11 +204,11 @@ def srgb_wp(rgb, wp1, wp2=6500, p1=None, p2=None):
     """adjust RGB to new whitepoint specified by colortemp"""
     if p1 is None:
         p1 = colour.RGB_COLOURSPACES['sRGB'].primaries
-    elif p1 is 'rad':
+    elif p1 == 'rad':
         p1 = RADIANCE_PRIMARIES
     if p2 is None:
         p2 = colour.RGB_COLOURSPACES['sRGB'].primaries
-    elif p2 is 'rad':
+    elif p2 == 'rad':
         p2 = RADIANCE_PRIMARIES
     cs1 = colour.RGB_Colourspace('cs1', p1, xy_from_wpspec(wp1))
     cs2 = colour.RGB_Colourspace('cs2', p2, xy_from_wpspec(wp2))
