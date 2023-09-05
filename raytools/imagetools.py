@@ -74,7 +74,7 @@ def hdr_ang2uv(imgf, useview=True, outf=None, **kwargs):
     return outf
 
 
-def array_rotate(imarray, ang, center=None, rotate_first=True, fill_value=None):
+def array_rotate(imarray, ang, center=None, rotate_first=True, fill_value=None, nearest=False):
     """rotate and center a angular fisheye image array
 
     Parameters
@@ -111,21 +111,26 @@ def array_rotate(imarray, ang, center=None, rotate_first=True, fill_value=None):
         cxyz = vm.pixel2ray(np.atleast_2d(center)[:, 0:2], res)
         vm2 = ViewMapper(dxyz=cxyz[0], viewangle=180)
         pxyz = vm2.view2world(vm.world2view(pxyz))
-    if (not rotate_first) and ang != 0:
-        pxyz = translate.rotate_elem(pxyz, ang, 1)
 
     pxy = vm.ray2pixel(pxyz, res, integer=False)
     x = np.arange(res)
+    if nearest:
+        method = "nearest"
+    else:
+        method = "linear"
     if len(imarray.shape) == 3:
         for i in range(3):
             instance = RegularGridInterpolator((x, x), imarray[i],
                                                bounds_error=False,
-                                               method='linear', fill_value=fill_value)
+                                               method=method, fill_value=fill_value)
             img[i].flat = instance(pxy).T.ravel()
     else:
         instance = RegularGridInterpolator((x, x), imarray, bounds_error=False,
-                                           method='linear', fill_value=fill_value)
+                                           method=method, fill_value=fill_value)
         img.flat = instance(pxy)
+
+    if (not rotate_first) and ang != 0:
+        img = array_rotate(img, ang, center=None, rotate_first=True, fill_value=fill_value, nearest=nearest)
     return img
 
 
