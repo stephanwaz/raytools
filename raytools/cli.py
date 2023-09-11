@@ -49,7 +49,7 @@ def main(ctx, config=None, n=None,  **kwargs):
                    '"avglum", "gcr", "ugp", "dgp", "tasklum", "backlum", '
                    '"dgp_t1", "log_gc", "dgp_t2", "ugr", "threshold", "pwsl2", '
                    '"view_area", "backlum_true", "srcillum", "srcarea", '
-                   '"maxlum", "gss"]')
+                   '"maxlum", "gss", "gssnb"]')
 @click.option("--parallel/--no-parallel", default=True,
               help="use available cores")
 @click.option("--peakn/--no-peakn", default=True,
@@ -108,6 +108,10 @@ def metric(ctx, imgs, metrics=None, parallel=True, peakn=False,
         gss = metrics.pop(metrics.index("gss"))
     except ValueError:
         gss = False
+    try:
+        gssnb = metrics.pop(metrics.index("gssnb"))
+    except ValueError:
+        gssnb = False
     if len(metrics) > 0:
         results = pool_call(imagetools.imgmetric, list(zip(imgs)), metrics,
                             cap=cap, desc="processing images", peakn=peakn,
@@ -120,6 +124,13 @@ def metric(ctx, imgs, metrics=None, parallel=True, peakn=False,
     if gss:
         gresult = np.asarray(hvsgsm.gss_compute(imgs))[:, None]
         metrics.append("gss")
+        if results is not None:
+            results = np.hstack((results, gresult))
+        else:
+            results = gresult
+    if gssnb:
+        gresult = np.asarray(hvsgsm.gss_compute(imgs, psf=False, adaptmove=False, directmove=False))[:, None]
+        metrics.append("gssnb")
         if results is not None:
             results = np.hstack((results, gresult))
         else:

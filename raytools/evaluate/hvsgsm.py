@@ -115,11 +115,11 @@ class GSS:
     Steps for applying model to an image:
 
         1. calculate eye illuminance from image
-        2. mask non-glare source pixels (not described in model, fixed thresh)
+        2. mask non-glare source pixels (REMOVED, only masks to 180 degree incidence)
         3. calculate pupil area and diameter
         4. calculate global retinal irradiance
-        5. calculate incident retinal irradiance of glare sources
-        6. apply PSF to (5)
+        5. calculate incident retinal irradiance of glare sources (REMOVED, calculate on totial irradiance)
+        6. apply PSF to (4)
         7. apply movement affecting adaptation to (6)
         8. apply movement affecting direct response to (6)
         9. calculate local adaptation using (7)
