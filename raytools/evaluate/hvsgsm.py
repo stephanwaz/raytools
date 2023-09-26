@@ -697,7 +697,6 @@ class GSS:
         # relative change in eccentricity is more important, so log is more
         # efficient
         steps = np.exp(np.linspace(np.log(self.emin), np.log(self.emax), 31))
-        # steps = np.linspace(self.emin, self.emax, 16)
         ubounds = np.concatenate(((steps[1:] + steps[:-1])/2, [1]))
         lbounds = np.concatenate(([0], ubounds[:-1]))
         for s, lb, ub in zip(steps, lbounds, ubounds):
@@ -730,7 +729,7 @@ class GSS:
             logistic
         """
         r_gc = 1/(1 + np.exp(-self.fr_a*(r - self.fr_b)))
-        # track as a seperate receptive field
+        # track as a separate receptive field
         r_go = 1/(1 + np.exp(self.fr_a*(r + self.fr_b)))
         r_gc.flat[self._nmask] = 0
         r_go.flat[self._nmask] = 0

@@ -8,9 +8,8 @@
 
 """mapper objects"""
 
-__all__ = ['Mapper', 'ViewMapper']
+__all__ = ['Mapper', 'ViewMapper', 'SolidViewMapper']
 
 from raytools.mapper.mapper import Mapper
 from raytools.mapper.viewmapper import ViewMapper
-
-
+from raytools.mapper.solidviewmapper import SolidViewMapper

@@ -14,7 +14,7 @@ import clasp.script_tools as cst
 
 from raytools import translate, io
 from raytools.evaluate import MetricSet, retina
-from raytools.mapper.viewmapper import ViewMapper
+from raytools.mapper import ViewMapper, SolidViewMapper
 from scipy.interpolate import RegularGridInterpolator
 
 
@@ -134,7 +134,54 @@ def array_rotate(imarray, ang, center=None, rotate_first=True, fill_value=None, 
     return img
 
 
-def hdr_rotate(imgf, outf=None, rotate=0.0, center=None, rotate_first=True, **kwargs):
+def hdr_remap(imarray, vmi, vmo, nearest=False):
+    res = imarray.shape[-1]
+    img, pxyz, mask, mask2, _ = vmi.init_img(res, features=3, indices=False)
+    pxyz = pxyz.reshape(-1, 3)[mask]
+    pxy = vmo.ray2pixel(pxyz, res, False)
+    x = np.arange(res) + .5
+    if nearest:
+        method = "nearest"
+    else:
+        method = "linear"
+    for i in range(3):
+        instance = RegularGridInterpolator((x, x), imarray[i],
+                                           bounds_error=False,
+                                           method=method, fill_value=None)
+        img[i].flat[mask] = instance(pxy).T.ravel()
+    return img
+
+
+def hdr_solid2ang(imgf, outf=None, nearest=False, stdout=False, reverse=False,
+                  viewangle=None, **kwargs):
+    imarray, header = io.hdr2carray(imgf, header=True)
+    if viewangle is None:
+        vm = hdr2vm(imgf)
+        if vm is None:
+            viewangle = 180
+        else:
+            viewangle = vm.viewangle
+
+    if reverse:
+        vmi = ViewMapper(viewangle=viewangle)
+        vmo = SolidViewMapper(viewangle=viewangle)
+        suff = "_2vts.hdr"
+    else:
+        vmi = SolidViewMapper(viewangle=viewangle)
+        vmo = ViewMapper(viewangle=viewangle)
+        suff = "_2vta.hdr"
+
+    if outf is None and not stdout:
+        outf = imgf.rsplit(".", 1)[0] + suff
+
+    img = hdr_remap(imarray, vmi, vmo, nearest=nearest)
+    header.append(vmo.header())
+    io.carray2hdr(img, outf, header)
+    return outf
+
+
+def hdr_rotate(imgf, outf=None, rotate=0.0, center=None, rotate_first=True,
+               nearest=False, **kwargs):
     cl = ""
     rl = ""
     if rotate_first and rotate != 0:
@@ -146,7 +193,8 @@ def hdr_rotate(imgf, outf=None, rotate=0.0, center=None, rotate_first=True, **kw
     if outf is None:
         outf = imgf.rsplit(".", 1)[0] + f"{cl}.hdr"
     imarray = io.hdr2carray(imgf)
-    img = array_rotate(imarray, rotate, center, rotate_first=rotate_first)
+    img = array_rotate(imarray, rotate, center, rotate_first=rotate_first,
+                       nearest=nearest)
     io.carray2hdr(img, outf)
     return outf
 
