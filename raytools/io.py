@@ -199,6 +199,21 @@ def carray2hdr(ar, imgf, header=None):
     return _array2hdr(ar.T[::-1], imgf, header, pval)
 
 
+def _hdr_in(pval, imgf, stdin):
+    p = Popen(shlex.split(pval), stdin=stdin, stdout=PIPE)
+    shape = p.stdout.readline().strip().split()
+    try:
+        shape = (int(shape[-3]), int(shape[-1]))
+    except IndexError:
+        if imgf == "":
+            imgf = "-"
+        if os.path.isfile(imgf):
+            raise ValueError(f"Bad HDR file '{imgf}'")
+        else:
+            raise ValueError(f"HDR image file '{imgf}' not found")
+    return p.stdout.read(), shape
+
+
 def hdr2array(imgf, stdin=None, header=False):
     """read np.array from hdr image
 
@@ -214,10 +229,7 @@ def hdr2array(imgf, stdin=None, header=False):
 
     """
     pval = f'pvalue -b -h -df -o {imgf}'
-    p = Popen(shlex.split(pval), stdin=stdin, stdout=PIPE)
-    shape = p.stdout.readline().strip().split()
-    shape = (int(shape[-3]), int(shape[-1]))
-    imgd = bytes2np(p.stdout.read(), shape).T[:, ::-1]
+    imgd = bytes2np(*_hdr_in(pval, imgf, stdin)).T[:, ::-1]
     if header:
         return imgd, hdr_header(imgf)
     return imgd
@@ -237,10 +249,9 @@ def hdr2carray(imgf, stdin=None, header=False):
     ar: np.array
     """
     pval = f'pvalue -n -h -df -o {imgf}'
-    p = Popen(shlex.split(pval), stdin=stdin, stdout=PIPE)
-    shape = p.stdout.readline().strip().split()
-    shape = (3, int(shape[-3]), int(shape[-1]))
-    imgd = np.transpose(bytes2np(p.stdout.read(), shape)[:, ::-1], (0, 2, 1))
+    data, shape = _hdr_in(pval, imgf, stdin)
+    shape = (3, *shape)
+    imgd = np.transpose(bytes2np(data, shape)[:, ::-1], (0, 2, 1))
     if header:
         return imgd, hdr_header(imgf)
     return imgd
