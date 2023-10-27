@@ -17,7 +17,7 @@ from scipy import stats
 
 import raytools
 from raytools.utility import pool_call
-from raytools import imagetools, translate
+from raytools import imagetools, translate, io
 from raytools.evaluate import hvsgsm
 
 
@@ -72,6 +72,11 @@ def main(ctx, config=None, n=None,  **kwargs):
                    "position is center of image with a 30 degree field of view")
 @click.option("-scale", default=179.,
               help="scale factor applied to pixel values to convert to cd/m^2")
+@click.option("-lumrgb", default=None, callback=clk.split_float,
+              help="channel coefficients for luminance. If None, trys to use "
+                   "LuminanceRGB from header, if given, overrides header data. "
+                   "If None and not found, defaults to radiance rgb space "
+                   "(0.265 0.670 0.065)")
 @click.option("--blursun/--no-blursun", default=False,
               help="applies human PSF to peak glare source (only if peakn=True")
 @click.option("--gssimage/--no-gssimage", default=False,
@@ -81,7 +86,7 @@ def main(ctx, config=None, n=None,  **kwargs):
 @clk.shared_decs(clk.command_decs(raytools.__version__, wrap=True))
 def metric(ctx, imgs, metrics=None, parallel=True, peakn=False,
               peaka=6.7967e-05, peakt=1e5, peakr=4.0, threshold=2000.,
-              scale=179., blursun=False, lowlight=False, gssimage=False, **kwargs):
+              scale=179., lumrgb=None, blursun=False, lowlight=False, gssimage=False, **kwargs):
     """calculate metrics for hdr images. This similar to evalglare but without
     glare source grouping, which is equivalent to -r 0 in evalglare.
     This ensures that all glare source positions are  weighted by the metrics
@@ -117,7 +122,7 @@ def metric(ctx, imgs, metrics=None, parallel=True, peakn=False,
     if len(metrics) > 0:
         results = pool_call(imagetools.imgmetric, list(zip(imgs)), metrics,
                             cap=cap, desc="processing images", peakn=peakn,
-                            peaka=peaka, peakt=peakt, peakr=peakr,
+                            peaka=peaka, peakt=peakt, peakr=peakr, lumrgb=lumrgb,
                             threshold=threshold, scale=scale, blursun=blursun,
                             lowlight=lowlight)
         results = np.asarray(results)
@@ -195,9 +200,20 @@ def solid2ang(ctx, img, reverse=False, nearest=False, stdout=True,
              viewangle=viewangle)
     else:
         results = pool_call(func, img, nearest=nearest, reverse=reverse,
-                            viewangle=viewangle)
+                            viewangle=viewangle, expandarg=False)
         print("Wrote the Following image files:", file=sys.stderr)
         print("\n".join(results), file=sys.stderr)
+    clk.tmp_clean(ctx)
+
+
+@main.command()
+@click.argument("img", callback=clk.is_file)
+@clk.shared_decs(clk.command_decs(raytools.__version__, wrap=True))
+def cleanheader(ctx, img, **kwargs):
+    imarray, header = io.hdr2carray(img, header=True)
+    io.carray2hdr(imarray, None, header, clean=True)
+    clk.tmp_clean(ctx)
+
 
 @main.command()
 @click.argument("dataf", callback=clk.is_file)

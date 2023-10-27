@@ -11,6 +11,8 @@
 import re
 import shlex
 import os
+import sys
+import textwrap
 from subprocess import Popen, PIPE
 
 import numpy as np
@@ -117,7 +119,7 @@ def bytefile2np(f, shape, dtype='<f'):
     return bytes2np(f.read(), shape, dtype)
 
 
-def _array2hdr(ar, imgf, header, pval):
+def _array2hdr(ar, imgf, header, pval, clean=False):
     """write 2d np.array to hdr image format
 
         Parameters
@@ -140,6 +142,8 @@ def _array2hdr(ar, imgf, header, pval):
     else:
         f = open(imgf, 'wb')
     if header is not None:
+        if clean:
+            header = clean_header(header)
         hdr = "' '".join(header)
         getinfo = shlex.split(f"getinfo -a '{hdr}'")
         p = Popen(pval.split(), stdin=PIPE, stdout=PIPE)
@@ -157,7 +161,7 @@ def _array2hdr(ar, imgf, header, pval):
     return imgf
 
 
-def array2hdr(ar, imgf, header=None):
+def array2hdr(ar, imgf, header=None, clean=False):
     """write 2d np.array (x,y) to hdr image format
 
     Parameters
@@ -174,12 +178,12 @@ def array2hdr(ar, imgf, header=None):
     imgf
     """
     if len(ar.shape) > 2:
-        return carray2hdr(ar, imgf, header)
+        return carray2hdr(ar, imgf, header, clean=clean)
     pval = f'pvalue -r -b -h -H -df -o -y {ar.shape[-1]} +x {ar.shape[-2]}'
-    return _array2hdr(ar.T[::-1], imgf, header, pval)
+    return _array2hdr(ar.T[::-1], imgf, header, pval, clean=clean)
 
 
-def carray2hdr(ar, imgf, header=None):
+def carray2hdr(ar, imgf, header=None, clean=False):
     """write color channel np.array (3, x, y) to hdr image format
 
     Parameters
@@ -196,7 +200,7 @@ def carray2hdr(ar, imgf, header=None):
     imgf
     """
     pval = f'pvalue -r -h -H -df -o -y {ar.shape[-1]} +x {ar.shape[-2]}'
-    return _array2hdr(ar.T[::-1], imgf, header, pval)
+    return _array2hdr(ar.T[::-1], imgf, header, pval, clean=clean)
 
 
 def _hdr_in(pval, imgf, stdin):
@@ -257,7 +261,31 @@ def hdr2carray(imgf, stdin=None, header=False):
     return imgd
 
 
-def hdr_header(imgf):
+def header_items(header, items):
+    items = [i.lower() for i in items]
+    out = [""] * len(items)
+    for line in header:
+        cl = line.strip()
+        if re.match(r".+:$", cl):
+            continue
+        sep = None
+        if "=" in cl:
+            sep = "="
+        key, val = cl.split(sep, 1)
+        key = key.lower()
+        if key in items:
+            out[items.index(key)] = val.strip()
+    return out
+
+
+def clean_header(header):
+    """remove redundant entries from radiance image header, updating view,
+    purging pvalue and clasp_tmp file names"""
+    return CleanHeader(header).header
+
+
+
+def hdr_header(imgf, clean=False, items=None):
     p = Popen(shlex.split(f"getinfo {imgf}"), stdout=PIPE, stderr=PIPE).communicate()
     err = p[1]
     try:
@@ -272,7 +300,12 @@ def hdr_header(imgf):
         raise IOError(f"{err} - wrong file type?")
     if "cannot open" in header:
         raise FileNotFoundError(f"{imgf} not found")
-    return [i for i in header.strip().splitlines() if not re.match(r".*#?RADIANCE.*", i)]
+    header = [i for i in header.strip().splitlines() if not re.match(r".*#?RADIANCE.*", i)]
+    if items is not None:
+        header = header_items(header, items=items)
+    elif clean:
+        header = clean_header(header)
+    return header
 
 
 def rgb2rad(rgb, vlambda=(0.265, 0.670, 0.065)):
@@ -339,3 +372,123 @@ def load_txt(farray, **kwargs):
     else:
         raise TypeError
 
+
+class CleanHeader(object):
+
+    def __init__(self, text, spacespertab=4, outtab="\t"):
+        self.spacespertab = spacespertab
+        self.outtab = outtab
+        self._data = None
+        self._header = None
+        self.text = text
+
+    @property
+    def data(self):
+        return self._data
+
+    @property
+    def header(self):
+        return self._header
+
+    @property
+    def text(self):
+        return self._text
+
+    @text.setter
+    def text(self, t):
+        if type(t) != str:
+            t = "\n".join(t)
+        self._text = t
+        self._data, view = self.preprocess()
+        header = self.make_header(self._data)
+        if view is not None:
+            header.append(f"VIEW={view}")
+        self._header = header
+
+    def preprocess(self, text=None):
+        if text is not None:
+            self._text = text
+
+        files = []
+        view = None  # only store last found view
+        vals = []  # use to check for redundant lines
+        cs = []  # the current stack of file nesting
+        for i, h in enumerate(self._text.splitlines()):
+            cl = h.strip()
+            cl = re.sub(r"\S*clasp_tmp\S*", "<stdin>", cl)
+
+            inset = re.match(r"\s*", h).group()
+            inset = inset.replace(" " * self.spacespertab,
+                                  "\t").replace(" ", "")
+            depth = len(inset)
+            if re.match(r"(.+):$", cl):
+                curf = cl.rsplit("/", 1)[-1][:-1]
+                fi = dict(name=curf, depth=depth, content=[])
+                if len(cs) == 0:
+                    cs.append(fi)
+                    files.append(fi)
+                elif depth > cs[-1]['depth']:
+                    cs[-1]['content'].append(fi)
+                    cs.append(fi)
+                else:
+                    le = depth - cs[-1]['depth']
+                    cs = cs[:-(le+1)]
+                    if len(cs) == 0:
+                        cs.append(fi)
+                        files.append(fi)
+                    else:
+                        cs[-1]['content'].append(fi)
+                        cs.append(fi)
+                continue
+
+            sep = None
+            if "=" in cl:
+                sep = "="
+            try:
+                key, val = cl.split(sep, 1)
+            except ValueError:
+                key = cl
+                val = ''
+            if key == "pvalue":
+                continue
+            if sep is None:
+                sep = " "
+            if key == "VIEW":
+                view = val
+                continue
+            if key == "...":
+                cs[-1]['content'][-1] += " " + val
+            elif cl not in vals:
+                vals.append(f"{key}{sep}{val}")
+                if depth <= cs[-1]['depth']:
+                    le = cs[-1]['depth'] - depth
+                    cs = cs[:-(le + 1)]
+                cs[-1]['content'].append(vals[-1])
+        return files, view
+
+    def _clean_up(self, data, depth=0, da=0):
+        outdata = []
+        for v in data:
+            if type(v) == str:
+                indent = self.outtab * (depth + 1 - da)
+                outdata.append(f"{indent}{v}")
+            elif len(v['content']) == 0:
+                continue
+            elif len(v['content']) == 1 and type(v['content'][0]) != str:
+                outdata += self._clean_up(v['content'], v['depth'], da+1)
+            elif np.all([type(i) != str for i in v['content']]):
+                outdata += self._clean_up(v['content'], v['depth'], da + 1)
+            else:
+                indent = self.outtab * (v['depth'] - da)
+                outdata.append(indent + v['name'] + ":")
+                outdata += self._clean_up(v['content'], v['depth'], da)
+        return outdata
+
+    def make_header(self, data):
+        outdata = self._clean_up(data)
+        hdr = [textwrap.fill(i, expand_tabs=False, replace_whitespace=False,
+                             drop_whitespace=False, width=150,
+                             subsequent_indent=re.match(r"\s*", i).group()
+                             + "   ...  ")
+               for i in outdata]
+        return "\n".join(hdr).splitlines()

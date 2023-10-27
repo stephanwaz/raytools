@@ -152,6 +152,19 @@ def hdr_remap(imarray, vmi, vmo, nearest=False):
     return img
 
 
+def array_solid2ang(imarray, nearest=False, reverse=False, viewangle=180,
+                    returnvm=True):
+    if reverse:
+        vmi = ViewMapper(viewangle=viewangle)
+        vmo = SolidViewMapper(viewangle=viewangle, name="vts")
+    else:
+        vmi = SolidViewMapper(viewangle=viewangle)
+        vmo = ViewMapper(viewangle=viewangle, name="vta")
+    if returnvm:
+        return hdr_remap(imarray, vmi, vmo, nearest=nearest), vmo
+    return hdr_remap(imarray, vmi, vmo, nearest=nearest)
+
+
 def hdr_solid2ang(imgf, outf=None, nearest=False, stdout=False, reverse=False,
                   viewangle=None, **kwargs):
     imarray, header = io.hdr2carray(imgf, header=True)
@@ -162,21 +175,13 @@ def hdr_solid2ang(imgf, outf=None, nearest=False, stdout=False, reverse=False,
         else:
             viewangle = vm.viewangle
 
-    if reverse:
-        vmi = ViewMapper(viewangle=viewangle)
-        vmo = SolidViewMapper(viewangle=viewangle)
-        suff = "_2vts.hdr"
-    else:
-        vmi = SolidViewMapper(viewangle=viewangle)
-        vmo = ViewMapper(viewangle=viewangle)
-        suff = "_2vta.hdr"
+    img, vmo = array_solid2ang(imarray, nearest, reverse, viewangle)
 
     if outf is None and not stdout:
-        outf = imgf.rsplit(".", 1)[0] + suff
+        outf = imgf.rsplit(".", 1)[0] + f"_2{vmo.name}.hdr"
 
-    img = hdr_remap(imarray, vmi, vmo, nearest=nearest)
     header.append(vmo.header())
-    io.carray2hdr(img, outf, header)
+    io.carray2hdr(img, outf, header, clean=True)
     return outf
 
 
@@ -439,12 +444,24 @@ def normalize_peak(v, o, l, scale=179, peaka=6.7967e-05, peakt=1e5, peakr=4,
         return pvol
 
 
-def imgmetric(imgf, metrics, peakn=False, scale=179, threshold=2000., lowlight=False,
+def imgmetric(imgf, metrics, peakn=False, scale=179, lumrgb=None, threshold=2000., lowlight=False,
               **peakwargs):
     vm = hdr2vm(imgf)
     if vm is None:
         vm = ViewMapper(viewangle=180)
-    v, o, l = hdr2vol(imgf, vm)
+    if lumrgb is None:
+        lumrgb = io.hdr_header(imgf, items=['luminancergb'])[0]
+        try:
+            lumrgb = [float(i) for i in lumrgb.split()]
+            if len(lumrgb) != 3:
+                raise IndexError
+        except IndexError:
+            lumrgb = None
+    if lumrgb is not None:
+        v, o, l = hdr2vol(imgf, vm, color=True)
+        l = io.rgb2rad(l.T, lumrgb).T
+    else:
+        v, o, l = hdr2vol(imgf, vm)
     if peakn:
         v, o, l = normalize_peak(v, o, l, scale, **peakwargs)
     return MetricSet(v, o, l, vm, metrics, scale=scale, threshold=threshold, lowlight=lowlight)()
