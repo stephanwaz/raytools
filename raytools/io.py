@@ -384,17 +384,20 @@ class CleanHeader(object):
         ----------
         text: Union(str, list)
             the header to process
-        spacespertab: int
+        spacespertab: int, optional
             convert leading spaces to tabs
-        outtab: str
+        outtab: str, optional
             output tab
+        headerwidth: int, optional
     """
 
-    def __init__(self, text, spacespertab=4, outtab="\t"):
+    def __init__(self, text, spacespertab=4, outtab="\t", headerwidth=150):
         self.spacespertab = spacespertab
         self.outtab = outtab
+        self.headerwidth = headerwidth
         self._header = None
         self.text = text
+
 
     @property
     def header(self):
@@ -423,7 +426,8 @@ class CleanHeader(object):
                 indent = re.match(r"\s*", i).group() + "   ...  "
             hdr.append(textwrap.fill(i, expand_tabs=False,
                                      replace_whitespace=False,
-                                     drop_whitespace=False, width=150,
+                                     drop_whitespace=False,
+                                     width=self.headerwidth,
                                      subsequent_indent=indent))
         header = "\n".join(hdr).splitlines()
         if view is not None:
@@ -490,6 +494,7 @@ class CleanHeader(object):
                 curf = files
             if key == "...":  # unwrap previously cleaned header
                 curf[-1] += " " + val
+                vals[-1] += " " + val
             elif cl in vals:  # promote
                 idx = self._pop_and_promote(files, cl)
                 if idx is not None:
