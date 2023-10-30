@@ -374,38 +374,66 @@ def load_txt(farray, **kwargs):
 
 
 class CleanHeader(object):
+    """takes lists of rgbe hdr format header lines (with tabbed hierarchy)
+    and processes to group redundant information and avoid overly long lines
+    (which throw errors with pfs tools). After initialization (or subsequent
+    call to text setter, the 'header' parameter holds the cleaned header result
+    as a list of header lines.
+
+    Parameters
+        ----------
+        text: Union(str, list)
+            the header to process
+        spacespertab: int
+            convert leading spaces to tabs
+        outtab: str
+            output tab
+    """
 
     def __init__(self, text, spacespertab=4, outtab="\t"):
         self.spacespertab = spacespertab
         self.outtab = outtab
-        self._data = None
         self._header = None
         self.text = text
 
     @property
-    def data(self):
-        return self._data
-
-    @property
     def header(self):
+        """the output header"""
         return self._header
 
     @property
     def text(self):
+        """text version of the input header"""
         return self._text
 
     @text.setter
     def text(self, t):
+        """process text into output header"""
         if type(t) != str:
             t = "\n".join(t)
         self._text = t
-        self._data, view = self.preprocess()
-        header = self.make_header(self._data)
+        data, view = self._preprocess()
+        outdata = self._clean_up(data, depth=-1)
+        hdr = []
+        for i in outdata:
+            try:
+                key, _ = i.strip().split("=", 1)
+                indent = re.match(r"\s*", i).group() + key + "= "
+            except ValueError:
+                indent = re.match(r"\s*", i).group() + "   ...  "
+            hdr.append(textwrap.fill(i, expand_tabs=False,
+                                     replace_whitespace=False,
+                                     drop_whitespace=False, width=150,
+                                     subsequent_indent=indent))
+        header = "\n".join(hdr).splitlines()
         if view is not None:
             header.append(f"VIEW={view}")
         self._header = header
 
-    def preprocess(self, text=None):
+    def _preprocess(self, text=None):
+        """process indentation into nested file hierarchy each file lines
+        creates a dictionary with 'content', 'depth', and 'name'. other
+        lines are filtered and stored as str items in the content list."""
         if text is not None:
             self._text = text
 
@@ -449,24 +477,59 @@ class CleanHeader(object):
             except ValueError:
                 key = cl
                 val = ''
-            if key == "pvalue":
+            if key in ["pvalue", "FORMAT"]:  # don't care about this
                 continue
             if sep is None:
                 sep = " "
-            if key == "VIEW":
+            if key == "VIEW":  # only store last view
                 view = val
                 continue
-            if key == "...":
-                cs[-1]['content'][-1] += " " + val
-            elif cl not in vals:
+            if len(cs) > 0:
+                curf = cs[-1]['content']
+            else:
+                curf = files
+            if key == "...":  # unwrap previously cleaned header
+                curf[-1] += " " + val
+            elif cl in vals:  # promote
+                idx = self._pop_and_promote(files, cl)
+                if idx is not None:
+                    f = files
+                    k = 0
+                    for j in idx[:-2]:
+                        k += 1
+                        f = f[j]['content']
+                    f.insert(idx[k], cl)
+            else:
                 vals.append(f"{key}{sep}{val}")
-                if depth <= cs[-1]['depth']:
+                if len(cs) > 0 and depth <= cs[-1]['depth']:
                     le = cs[-1]['depth'] - depth
                     cs = cs[:-(le + 1)]
-                cs[-1]['content'].append(vals[-1])
+                if len(cs) > 0:
+                    cs[-1]['content'].append(vals[-1])
+                else:
+                    files.append(vals[-1])
         return files, view
 
+    def _pop_and_promote(self, data, val, idx=None):
+        """recursive function that pops existing value out of list and reutrns
+        idx (at eack depth level of data) where the value was. Used to take
+        duplicate header lines and promote them up to a higher tab level"""
+        if idx is None:
+            idx = []
+        for i, v in enumerate(data):
+            if type(v) == str:
+                if v == val:
+                    if len(idx) == 0:
+                        return None
+                    data.pop(i)
+                    return idx + [i]
+                continue
+            return self._pop_and_promote(v['content'], val, idx + [i])
+        return idx
+
     def _clean_up(self, data, depth=0, da=0):
+        """recursive function to format the prepocessed data into a new
+        header"""
         outdata = []
         for v in data:
             if type(v) == str:
@@ -483,12 +546,3 @@ class CleanHeader(object):
                 outdata.append(indent + v['name'] + ":")
                 outdata += self._clean_up(v['content'], v['depth'], da)
         return outdata
-
-    def make_header(self, data):
-        outdata = self._clean_up(data)
-        hdr = [textwrap.fill(i, expand_tabs=False, replace_whitespace=False,
-                             drop_whitespace=False, width=150,
-                             subsequent_indent=re.match(r"\s*", i).group()
-                             + "   ...  ")
-               for i in outdata]
-        return "\n".join(hdr).splitlines()

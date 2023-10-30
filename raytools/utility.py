@@ -8,16 +8,13 @@
 # =======================================================================
 
 """progress bar"""
-import re
 import shutil
-import textwrap
 from datetime import datetime
 
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from concurrent.futures import wait, FIRST_COMPLETED
 from multiprocessing import get_context
 
-import numpy as np
 from tqdm import tqdm
 from raytools import io
 
