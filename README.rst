@@ -1,5 +1,5 @@
 ====================
-raytools (0.1.4)
+raytools (0.1.5)
 ====================
 
 .. image:: https://img.shields.io/pypi/v/raytools?style=flat-square
