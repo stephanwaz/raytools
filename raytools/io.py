@@ -271,7 +271,11 @@ def header_items(header, items):
         sep = None
         if "=" in cl:
             sep = "="
-        key, val = cl.split(sep, 1)
+        try:
+            key, val = cl.split(sep, 1)
+        except ValueError:
+            key = cl
+            val = ''
         key = key.lower()
         if key in items:
             out[items.index(key)] = val.strip()
@@ -447,7 +451,7 @@ class CleanHeader(object):
         cs = []  # the current stack of file nesting
         for i, h in enumerate(self._text.splitlines()):
             cl = h.strip()
-            cl = re.sub(r"\S*clasp_tmp\S*", "<stdin>", cl)
+            cl = re.sub(r"\S*clasp_tmp[^\s:]*", "<stdin>", cl)
 
             inset = re.match(r"\s*", h).group()
             inset = inset.replace(" " * self.spacespertab,

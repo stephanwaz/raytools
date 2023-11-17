@@ -8,10 +8,11 @@
 
 """Image and other (v,o,l) evaluation routines"""
 
-__all__ = ['BaseMetricSet', 'MetricSet', 'PositionIndex', 'retina',
+__all__ = ['BaseMetricSet', 'MetricSet', 'ColorMetricSet', 'PositionIndex', 'retina',
            'GSS', 'hvsgsm']
 
 from raytools.evaluate.basemetricset import BaseMetricSet
 from raytools.evaluate.metricset import MetricSet
+from raytools.evaluate.colormetricset import ColorMetricSet
 from raytools.evaluate.positionindex import PositionIndex
 from raytools.evaluate.hvsgsm import GSS

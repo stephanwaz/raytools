@@ -183,7 +183,9 @@ class BaseMetricSet(object):
                 # get ray squares that overlap edge of view
                 onedge = self.radians > (self.vm.viewangle * np.pi / 360 - ray_side)
                 edgetotal = np.sum(og[onedge])
-                adjust = 1 - excess/edgetotal
+                adjust = 1
+                if edgetotal > 0:
+                    adjust -= excess/edgetotal
                 # if this fails increase search radius to ensure enough rays to
                 # absorb the adjustment
                 if adjust < 0:

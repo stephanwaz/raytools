@@ -164,8 +164,10 @@ def metric(ctx, imgs, metrics=None, parallel=True, peakn=False,
               help="order to apply rotation and centering")
 @click.option("--nearest/--no-nearest", default=False,
               help="use nearest interpolation (only for center/rotate")
+@click.option("--stdout/--no-stdout", default=False,
+              help="use stdout with single image input")
 @clk.shared_decs(clk.command_decs(raytools.__version__, wrap=True))
-def project(ctx, img, uv2ang=False, useview=True, rotate=0.0, center=None, rotate_first=True, nearest=False, **kwargs):
+def project(ctx, img, uv2ang=False, useview=True, rotate=0.0, center=None, rotate_first=True, nearest=False, stdout=False, **kwargs):
     """project images between angular and shirley-chiu square coordinates"""
     if rotate != 0 or center is not None:
         func = imagetools.hdr_rotate
@@ -173,10 +175,18 @@ def project(ctx, img, uv2ang=False, useview=True, rotate=0.0, center=None, rotat
         func = imagetools.hdr_uv2ang
     else:
         func = imagetools.hdr_ang2uv
-    results = pool_call(func, img, expandarg=False, useview=useview,
-                        rotate=rotate, center=center, rotate_first=rotate_first, nearest=nearest)
-    print("Wrote the Following image files:", file=sys.stderr)
-    print("\n".join(results), file=sys.stderr)
+    if len(img) == 1:
+        result = func(img[0], useview=useview, stdout=stdout,
+                      rotate=rotate, center=center, rotate_first=rotate_first,
+                      nearest=nearest)
+        if not stdout:
+            print(f"Wrote: {result}", file=sys.stderr)
+    else:
+        results = pool_call(func, img, expandarg=False, useview=useview,
+                            rotate=rotate, center=center, rotate_first=rotate_first,
+                            nearest=nearest)
+        print("Wrote the Following image files:", file=sys.stderr)
+        print("\n".join(results), file=sys.stderr)
 
 
 @main.command()
