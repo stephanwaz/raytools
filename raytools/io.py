@@ -204,7 +204,7 @@ def carray2hdr(ar, imgf, header=None, clean=False):
 
 
 def _hdr_in(pval, imgf, stdin):
-    p = Popen(shlex.split(pval), stdin=stdin, stdout=PIPE)
+    p = Popen(shlex.split(pval), stdin=stdin, stdout=PIPE, stderr=PIPE)
     shape = p.stdout.readline().strip().split()
     try:
         shape = (int(shape[-3]), int(shape[-1]))
@@ -212,9 +212,11 @@ def _hdr_in(pval, imgf, stdin):
         if imgf == "":
             imgf = "-"
         if os.path.isfile(imgf):
-            raise ValueError(f"Bad HDR file '{imgf}'")
+            raise ValueError(f"Bad HDR file '{imgf}',\n"
+                             f"pvalue msg: {p.stderr}")
         else:
-            raise ValueError(f"HDR image file '{imgf}' not found")
+            raise ValueError(f"HDR image file '{imgf}' not found,\n"
+                             f"pvalue msg: {p.stderr}")
     return p.stdout.read(), shape
 
 
@@ -288,9 +290,16 @@ def clean_header(header):
     return CleanHeader(header).header
 
 
+def is_hdr(imgf):
+    f = open(imgf)
+    ishdr = f.read(10) == b'#?RADIANCE'
+    f.close()
+    return ishdr
+
 
 def hdr_header(imgf, clean=False, items=None):
-    p = Popen(shlex.split(f"getinfo {imgf}"), stdout=PIPE, stderr=PIPE).communicate()
+    p = Popen(shlex.split(f"getinfo {imgf}"), stdout=PIPE,
+              stderr=PIPE).communicate()
     err = p[1]
     try:
         err = err.decode("utf-8")

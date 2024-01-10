@@ -13,3 +13,4 @@ pytest-cov
 setuptools
 coveralls
 pyyaml
+build
