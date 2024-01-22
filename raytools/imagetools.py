@@ -108,9 +108,16 @@ def array_rotate(imarray, ang, center=None, rotate_first=True, fill_value=None, 
     if rotate_first and ang != 0:
         pxyz = translate.rotate_elem(pxyz, ang, 1)
     if center is not None:
-        cxyz = vm.pixel2ray(np.atleast_2d(center)[:, 0:2], res)
-        vm2 = ViewMapper(dxyz=cxyz[0], viewangle=180)
-        pxyz = vm2.view2world(vm.world2view(pxyz))
+        if len(center) == 4:
+            targets = vm.pixel2ray(np.reshape(center, (2, 2)), res)
+            m1 = translate.rmtx_yp(targets[1])
+            m2 = translate.rmtx_yp(targets[0])
+            m3 = m2[0].T @ m2[1].T @ m1[1] @ m1[0]
+            pxyz = (m3 @ pxyz.T).T
+        else:
+            cxyz = vm.pixel2ray(np.atleast_2d(center)[:, 0:2], res)
+            vm2 = ViewMapper(dxyz=cxyz[0], viewangle=180)
+            pxyz = vm2.view2world(vm.world2view(pxyz))
 
     pxy = vm.ray2pixel(pxyz, res, integer=False)
     x = np.arange(res)

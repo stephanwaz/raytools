@@ -154,37 +154,52 @@ def metric(ctx, imgs, metrics=None, parallel=True, peakn=False,
 @click.option("--useview/--no-useview", default=True,
               help="use view direction for transform ang2uv to match standard"
                    "projection")
-@click.option("-rotate", default=0.0,
-              help="degrees to rotate img (overrides projection, "
-                   "assumes angular fisheye input)")
-@click.option("-center", default=None, callback=clk.split_int,
-              help="new image center give as pixel 'x y' (overrides projection,"
-                   "assumes angular fisheye input)")
-@click.option("--rotate-first/--center-first", default=True,
-              help="order to apply rotation and centering")
-@click.option("--nearest/--no-nearest", default=False,
-              help="use nearest interpolation (only for center/rotate")
 @click.option("--stdout/--no-stdout", default=False,
               help="use stdout with single image input")
 @clk.shared_decs(clk.command_decs(raytools.__version__, wrap=True))
-def project(ctx, img, uv2ang=False, useview=True, rotate=0.0, center=None, rotate_first=True, nearest=False, stdout=False, **kwargs):
+def project(ctx, img, uv2ang=False, useview=True, stdout=False, **kwargs):
     """project images between angular and shirley-chiu square coordinates"""
-    if rotate != 0 or center is not None:
-        func = imagetools.hdr_rotate
-    elif uv2ang:
+    if uv2ang:
         func = imagetools.hdr_uv2ang
     else:
         func = imagetools.hdr_ang2uv
     if len(img) == 1:
-        result = func(img[0], useview=useview, stdout=stdout,
+        result = func(img[0], useview=useview, stdout=stdout)
+        if not stdout:
+            print(f"Wrote: {result}", file=sys.stderr)
+    else:
+        results = pool_call(func, img, expandarg=False, useview=useview)
+        print("Wrote the Following image files:", file=sys.stderr)
+        print("\n".join(results), file=sys.stderr)
+
+
+@main.command()
+@click.argument("img", callback=clk.are_files)
+@click.option("-rotate", default=0.0,
+              help="degrees to rotate img")
+@click.option("-center", default=None, callback=clk.split_int,
+              help="new image center give as pixel 'x y' or to align to a "
+                   "non-center point, give as 'sx sy ex ey'")
+@click.option("--rotate-first/--center-first", default=True,
+              help="order to apply rotation and centering")
+@click.option("--nearest/--no-nearest", default=False,
+              help="use nearest interpolation")
+@click.option("--stdout/--no-stdout", default=False,
+              help="use stdout with single image input")
+@clk.shared_decs(clk.command_decs(raytools.__version__, wrap=True))
+def align(ctx, img, useview=True, rotate=0.0, center=None, rotate_first=True,
+          nearest=False, stdout=False, **kwargs):
+    """project images between angular and shirley-chiu square coordinates"""
+    if len(img) == 1:
+        result = imagetools.hdr_rotate(img[0], useview=useview, stdout=stdout,
                       rotate=rotate, center=center, rotate_first=rotate_first,
                       nearest=nearest)
         if not stdout:
             print(f"Wrote: {result}", file=sys.stderr)
     else:
-        results = pool_call(func, img, expandarg=False, useview=useview,
-                            rotate=rotate, center=center, rotate_first=rotate_first,
-                            nearest=nearest)
+        results = pool_call(imagetools.hdr_rotate, img, expandarg=False,
+                            useview=useview, rotate=rotate, center=center,
+                            rotate_first=rotate_first, nearest=nearest)
         print("Wrote the Following image files:", file=sys.stderr)
         print("\n".join(results), file=sys.stderr)
 
