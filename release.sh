@@ -26,8 +26,6 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then
     clean=$(git status --porcelain --untracked-files=no | wc -l)
     if [ "$clean" -lt 1 ]; then
         if [[ $# == 1 && ($1 == "patch" || $1 == "minor" || $1 == "major" || $1 == v*.*.* || $1 == "continue") ]]; then
-            git checkout release
-            git merge master
             if [[ $1 == v*.*.* ]]; then
                 git tag -a "$1" -m "tagged for release $1"
             elif [[ $1 == "continue" ]]; then
@@ -42,9 +40,6 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then
             if [ "$answer" != "${answer#[Yy]}" ] ;then
                 twine upload dist/*.tar.gz dist/*.whl
                 git push
-                git checkout master
-                git merge release
-                git push
                 tag="$(git tag | tail -1)"
                 git push origin $tag
 			else
@@ -53,7 +48,7 @@ if [ "$answer" != "${answer#[Yy]}" ] ;then
         else
             echo usage: ./release.sh "[patch/minor/major]"
             echo usage: ./release.sh "vX.X.X (assumes bumpversion has already been run and vX.X.X matches)"
-            echo usage: ./release.sh "continue (for picking up an aborted release, run after git commit --amend from master branch)"
+            echo usage: ./release.sh "continue (for picking up an aborted release, run after git commit --amend)"
         fi
     else
         echo working directory is not clean!
