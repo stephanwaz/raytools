@@ -471,7 +471,11 @@ def imgmetric(imgf, metrics, peakn=False, scale=179, lumrgb=None, threshold=2000
     vm = hdr2vm(imgf)
     if vm is None:
         vm = ViewMapper(viewangle=180)
-    needscolor = not MetricSet.check_metrics(metrics)
+    needscolor = False
+    try:
+        MetricSet.check_metrics(metrics, True)
+    except AttributeError:
+        needscolor = True
     if needscolor and lumrgb is None:
         lumrgb = io.hdr_header(imgf, items=['luminancergb'])[0]
         try:

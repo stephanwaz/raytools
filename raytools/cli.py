@@ -45,7 +45,7 @@ def main(ctx, config=None, n=None,  **kwargs):
 @main.command()
 @click.argument("imgs", callback=clk.are_files)
 @click.option("-metrics", callback=clk.split_str, default="illum dgp ugp",
-              help='metrics to compute, choices: ["illum", '
+              help='metrics to compute, choices: ["illum", "irradiance" (RGB channels), '
                    '"avglum", "gcr", "ugp", "dgp", "tasklum", "backlum", '
                    '"dgp_t1", "log_gc", "dgp_t2", "ugr", "threshold", "pwsl2", '
                    '"view_area", "backlum_true", "srcillum", "srcarea", '

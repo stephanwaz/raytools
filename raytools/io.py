@@ -264,6 +264,7 @@ def hdr2carray(imgf, stdin=None, header=False):
 
 
 def header_items(header, items):
+    header = CleanHeader(header, headerwidth=4096).header
     items = [i.lower() for i in items]
     out = [""] * len(items)
     for line in header:
@@ -458,6 +459,7 @@ class CleanHeader(object):
         view = None  # only store last found view
         vals = []  # use to check for redundant lines
         cs = []  # the current stack of file nesting
+        lastkey = ""
         for i, h in enumerate(self._text.splitlines()):
             cl = h.strip()
             cl = re.sub(r"\S*clasp_tmp[^\s:]*", "<stdin>", cl)
@@ -505,9 +507,9 @@ class CleanHeader(object):
                 curf = cs[-1]['content']
             else:
                 curf = files
-            if key == "...":  # unwrap previously cleaned header
-                curf[-1] += " " + val
-                vals[-1] += " " + val
+            if key == "..." or key == lastkey:  # unwrap previously cleaned header
+                curf[-1] += " " + val.lstrip()
+                vals[-1] += " " + val.lstrip()
             elif cl in vals:  # promote
                 idx = self._pop_and_promote(files, cl)
                 if idx is not None:
@@ -526,6 +528,7 @@ class CleanHeader(object):
                     cs[-1]['content'].append(vals[-1])
                 else:
                     files.append(vals[-1])
+            lastkey = key
         return files, view
 
     def _pop_and_promote(self, data, val, idx=None):
