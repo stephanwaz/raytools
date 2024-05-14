@@ -189,7 +189,7 @@ def project(ctx, img, uv2ang=False, useview=True, stdout=False, **kwargs):
 @clk.shared_decs(clk.command_decs(raytools.__version__, wrap=True))
 def align(ctx, img, useview=True, rotate=0.0, center=None, rotate_first=True,
           nearest=False, stdout=False, **kwargs):
-    """project images between angular and shirley-chiu square coordinates"""
+    """align angular fisheye images via aiming and rotating at/around a pixel"""
     if len(img) == 1:
         result = imagetools.hdr_rotate(img[0], useview=useview, stdout=stdout,
                       rotate=rotate, center=center, rotate_first=rotate_first,
@@ -202,6 +202,7 @@ def align(ctx, img, useview=True, rotate=0.0, center=None, rotate_first=True,
                             rotate_first=rotate_first, nearest=nearest)
         print("Wrote the Following image files:", file=sys.stderr)
         print("\n".join(results), file=sys.stderr)
+    clk.tmp_clean(ctx)
 
 
 @main.command()
@@ -268,10 +269,7 @@ def smooth(ctx, dataf, x=0, x_out=(1000.0,), y=(-1,), sigma=None, sf=1.0,
     if sigma is None:
         sigma = np.sqrt(np.cov(dx) * len(dx) ** (-.4))
     sigma *= sf
-    if dx.size > 10000:
-        bw = 500
-    else:
-        bw = None
+    bw = None
     if dy.size == 0:
         k = stats.gaussian_kde(dx, bw_method=sigma)
         y_out = k(x_out)[None]
@@ -281,6 +279,7 @@ def smooth(ctx, dataf, x=0, x_out=(1000.0,), y=(-1,), sigma=None, sf=1.0,
                                                       bw=bw)
     for x, yo in zip(x_out, y_out.T):
         print(x, *yo)
+    clk.tmp_clean(ctx)
 
 
 

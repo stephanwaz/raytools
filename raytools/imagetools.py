@@ -141,24 +141,6 @@ def array_rotate(imarray, ang, center=None, rotate_first=True, fill_value=None, 
     return img
 
 
-def hdr_remap(imarray, vmi, vmo, nearest=False):
-    res = imarray.shape[-1]
-    img, pxyz, mask, mask2, _ = vmi.init_img(res, features=3, indices=False)
-    pxyz = pxyz.reshape(-1, 3)[mask]
-    pxy = vmo.ray2pixel(pxyz, res, False)
-    x = np.arange(res) + .5
-    if nearest:
-        method = "nearest"
-    else:
-        method = "linear"
-    for i in range(3):
-        instance = RegularGridInterpolator((x, x), imarray[i],
-                                           bounds_error=False,
-                                           method=method, fill_value=None)
-        img[i].flat[mask] = instance(pxy).T.ravel()
-    return img
-
-
 def array_solid2ang(imarray, nearest=False, reverse=False, viewangle=180,
                     returnvm=True):
     if reverse:
@@ -168,8 +150,8 @@ def array_solid2ang(imarray, nearest=False, reverse=False, viewangle=180,
         vmi = SolidViewMapper(viewangle=viewangle)
         vmo = ViewMapper(viewangle=viewangle, name="vta")
     if returnvm:
-        return hdr_remap(imarray, vmi, vmo, nearest=nearest), vmo
-    return hdr_remap(imarray, vmi, vmo, nearest=nearest)
+        return vmi.transform_to(imarray, vmo, nearest=nearest), vmo
+    return vmi.transform_to(imarray, vmo, nearest=nearest)
 
 
 def hdr_solid2ang(imgf, outf=None, nearest=False, stdout=False, reverse=False,

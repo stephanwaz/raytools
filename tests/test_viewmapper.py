@@ -2,10 +2,26 @@
 # -*- coding: utf-8 -*-
 
 """Tests for raytools.scene"""
+import os
+import shutil
+
 import pytest
-from raytools import translate
-from raytools.mapper import ViewMapper, Mapper
+from raytools import translate, io
+from raytools.mapper import ViewMapper, Mapper, SolidViewMapper
 import numpy as np
+
+
+@pytest.fixture(scope="module")
+def tmpdir(tmp_path_factory):
+    data = str(tmp_path_factory.mktemp("data"))
+    shutil.copytree('tests/testdir/', data + '/test')
+    cpath = os.getcwd()
+    path = data + '/test'
+    # uncomment to use actual (to debug results)
+    # path = cpath + '/tests/testdir'
+    os.chdir(path)
+    yield path
+    os.chdir(cpath)
 
 
 def test_viewmapper():
@@ -114,3 +130,27 @@ def test_mapper():
     avec = np.array(((.45, .9, 0),))
     img = vm.add_vecs_to_img(img, avec, grow=1)
     assert np.isclose(np.sum(img), 9)
+
+
+def test_solid_mapper(tmpdir):
+    vmi = ViewMapper(viewangle=180)
+    vmo = SolidViewMapper()
+    imarray = io.hdr2carray("oct21_detail_glz_EW_desk.hdr")
+    res = imarray.shape[-1]
+    img, pxyz, mask, mask2, _ = vmi.init_img(res, features=3, indices=False)
+    pxyz = pxyz.reshape(-1, 3)[mask]
+    pxy = vmo.ray2pixel(pxyz, res, True)
+    pxy = np.ravel_multi_index(pxy.T, (res, res))
+    # img[mask] = imarray[:, pxy]
+    for i in range(3):
+        img[i].flat[mask] = imarray[i].flat[pxy]
+    io.carray2hdr(img, "solid.hdr")
+    img2 = np.zeros(img.shape)
+    pxyz = vmo.pixelrays(res).reshape(-1, 3)[mask]
+    pxy = vmi.ray2pixel(pxyz, res, True)
+    pxy = np.ravel_multi_index(pxy.T, (res, res))
+    for i in range(3):
+        img2[i].flat[mask] = img[i].flat[pxy]
+    io.carray2hdr(img2, "ang2.hdr")
+    assert np.average(np.abs(imarray[1].flat[mask]-img2[1].flat[mask])/imarray[1].flat[mask]) < 0.01
+    assert np.abs(np.average((imarray[1].flat[mask] - img2[1].flat[mask]) / imarray[1].flat[ mask])) < 0.001

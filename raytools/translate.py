@@ -556,7 +556,7 @@ def non_uniform_gaussian_filter(x, y, xr=None, sigma=None, sscale=1.0,
     else:  # bandwidth on resample
         nugf = _nugf_x_bw
         idxs = xr
-    amu = np.apply_along_axis(nugf, 0, idxs.reshape(1, -1), x, y, sigma)
+    amu = np.apply_along_axis(nugf, 0, np.reshape(idxs, (1, -1)), x, y, sigma)
     # sort back unless already sorted or resampled
     if inv_sort is not None and resample is None:
         amu = amu[inv_sort]

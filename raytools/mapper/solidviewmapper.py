@@ -16,7 +16,9 @@ class SolidViewMapper(ViewMapper):
     given view angle. pixel projection yields equisolid projection
 
     NOTE: view angle is given in equiangular basis, so will not match when
-    less than 180.
+    less than 180. Note: this does not match fisheyecorr_cal for unknown reasons
+    but this code has been tested using projection maps from
+    https://paulbourke.net/dome/fisheyetypes/
 
     Parameters
     ----------
@@ -46,7 +48,7 @@ class SolidViewMapper(ViewMapper):
         # radius in equisolid
         r = 2 * np.arcsin(r_a * np.sqrt(2) / np.pi)
         # equisolid coordinates
-        so_xy = a_xy * r / r_a
+        so_xy = a_xy * r / (r_a + 1e-9)
         # scale back to 0,1
         pxy = so_xy / vs + .5
         return pxy
@@ -62,7 +64,7 @@ class SolidViewMapper(ViewMapper):
         # radius in equiangular
         r_a = np.sin(r/2) * np.pi/np.sqrt(2)
         # equiangular coordinates
-        a_xy = so_xy * r_a / r
+        a_xy = so_xy * r_a / (r + 1e-9)
         # scale back to -.5,.5
         pxy = a_xy / vs
         # now the standard transform from angular to world

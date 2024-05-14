@@ -7,6 +7,7 @@
 # file, You can obtain one at http://mozilla.org/MPL/2.0/.
 # =======================================================================
 import numpy as np
+from scipy.interpolate import RegularGridInterpolator
 
 from raytools.mapper.mapper import Mapper
 from raytools.mapper.angularmixin import AngularMixin
@@ -92,3 +93,49 @@ class ViewMapper(AngularMixin, Mapper):
             offset = 0.5
         uv = (si.T + offset)/shape[1]
         return uv
+
+    def transform_to(self, imarray, other, nearest=False):
+        """take an image arrray with an assumed projection of self and
+        transform it to other
+
+        Parameters
+        ----------
+        imarray : np.array
+            2-d or 3-d array with (features,x,y)
+        other : raytools.ViewMapper
+            the destination view
+        nearest : bool
+            disable linear interpolation and use nearest pixel
+            sets the method= of scipy.interpolate.RegularGridInterpolator
+
+        Returns
+        -------
+        np.array
+        """
+        res = imarray.shape[-1]
+        if len(imarray.shape) == 3:
+            features = imarray.shape[0]
+        else:
+            features = 1
+        img = np.zeros_like(imarray)
+        pxyz = self.pixelrays(res)
+        imask = self.in_view(pxyz, indices=False)
+        mask = other.in_view(pxyz, indices=False)
+
+        pxyz = pxyz.reshape(-1, 3)
+        pxy = other.ray2pixel(pxyz[mask], res, False)
+        x = np.arange(res) + .5
+        if nearest:
+            method = "nearest"
+        else:
+            method = "linear"
+        imarray = imarray.reshape(features, *imarray.shape[-2:])
+        oshape = img.shape
+        img = img.reshape(imarray.shape)
+        for i in range(features):
+            instance = RegularGridInterpolator((x, x), imarray[i],
+                                               bounds_error=False,
+                                               method=method,
+                                               fill_value=None)
+            img[i].flat[mask] = instance(pxy).T.ravel()
+        return img.reshape(oshape)
