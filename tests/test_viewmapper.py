@@ -134,19 +134,18 @@ def test_mapper():
 
 def test_solid_mapper(tmpdir):
     vmi = ViewMapper(viewangle=180)
-    vmo = SolidViewMapper()
     imarray = io.hdr2carray("oct21_detail_glz_EW_desk.hdr")
     res = imarray.shape[-1]
     img, pxyz, mask, mask2, _ = vmi.init_img(res, features=3, indices=False)
     pxyz = pxyz.reshape(-1, 3)[mask]
-    pxy = vmo.ray2pixel(pxyz, res, True)
+    pxy = vmi.solid_ray2pixel(pxyz, res, True)
     pxy = np.ravel_multi_index(pxy.T, (res, res))
     # img[mask] = imarray[:, pxy]
     for i in range(3):
         img[i].flat[mask] = imarray[i].flat[pxy]
     io.carray2hdr(img, "solid.hdr")
     img2 = np.zeros(img.shape)
-    pxyz = vmo.pixelrays(res).reshape(-1, 3)[mask]
+    pxyz = vmi.solid_pixelrays(res).reshape(-1, 3)[mask]
     pxy = vmi.ray2pixel(pxyz, res, True)
     pxy = np.ravel_multi_index(pxy.T, (res, res))
     for i in range(3):

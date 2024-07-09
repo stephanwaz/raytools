@@ -194,11 +194,11 @@ def hdr_rotate(imgf, outf=None, rotate=0.0, center=None, rotate_first=True,
     return outf
 
 
-def hdr2vol(imgf, vm=None, color=False):
+def hdr2vol(imgf, vm=None, color=False, vlambda=None):
     if color:
         ar = io.hdr2carray(imgf)
     else:
-        ar = io.hdr2array(imgf)
+        ar = io.hdr2array(imgf, vlambda=vlambda)
     if vm is None:
         vm = hdr2vm(imgf)
     vecs = vm.pixelrays(ar.shape[-1]).reshape(-1, 3)
@@ -458,16 +458,18 @@ def imgmetric(imgf, metrics, peakn=False, scale=179, lumrgb=None, threshold=2000
         MetricSet.check_metrics(metrics, True)
     except AttributeError:
         needscolor = True
-    if needscolor and lumrgb is None:
-        lumrgb = io.hdr_header(imgf, items=['luminancergb'])[0]
+    if lumrgb is None:
+        lumrgb = io.hdr_header(imgf, items=['luminancergb'])[-1]
         try:
             lumrgb = [float(i) for i in lumrgb.split()]
             if len(lumrgb) != 3:
                 raise IndexError
         except IndexError:
-            lumrgb = (0.26507413, 0.67011463, 0.06481124)
-    needscolor = lumrgb is not None
-    v, o, l = hdr2vol(imgf, vm, needscolor)
+            lumrgb = None
+        else:
+            if not needscolor and np.allclose((0.26507413, 0.67011463, 0.06481124), lumrgb, atol=.001):
+                lumrgb = None
+    v, o, l = hdr2vol(imgf, vm, needscolor, vlambda=lumrgb)
     if peakn:
         v, o, l = normalize_peak(v, o, l, scale, **peakwargs)
     if needscolor:

@@ -154,6 +154,7 @@ class AngularMixin(object):
             output view projection chose from::
 
                 angular: '[Aa]*', 'vta', 'fish*'
+                equisolid: '[Ee]*', 'vte'
                 shirley chiu: '[Uu]*', 'square'
 
         Returns

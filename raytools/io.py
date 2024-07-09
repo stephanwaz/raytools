@@ -220,7 +220,7 @@ def _hdr_in(pval, imgf, stdin):
     return p.stdout.read(), shape
 
 
-def hdr2array(imgf, stdin=None, header=False):
+def hdr2array(imgf, stdin=None, header=False, vlambda=None):
     """read np.array from hdr image
 
     Parameters
@@ -234,8 +234,12 @@ def hdr2array(imgf, stdin=None, header=False):
     ar: np.array
 
     """
-    pval = f'pvalue -b -h -df -o {imgf}'
-    imgd = bytes2np(*_hdr_in(pval, imgf, stdin)).T[:, ::-1]
+    if vlambda is not None:
+        imgd = hdr2carray(imgf, stdin)
+        imgd = np.einsum("ijk,i->jk", imgd, vlambda)
+    else:
+        pval = f'pvalue -b -h -df -o {imgf}'
+        imgd = bytes2np(*_hdr_in(pval, imgf, stdin)).T[:, ::-1]
     if header:
         return imgd, hdr_header(imgf)
     return imgd
@@ -507,7 +511,7 @@ class CleanHeader(object):
                 curf = cs[-1]['content']
             else:
                 curf = files
-            if key == "..." or key == lastkey:  # unwrap previously cleaned header
+            if key == "..." or key == lastkey and len(curf) > 0:  # unwrap previously cleaned header
                 curf[-1] += " " + val.lstrip()
                 vals[-1] += " " + val.lstrip()
             elif cl in vals:  # promote
