@@ -119,7 +119,6 @@ class ViewMapper(AngularMixin, Mapper):
             features = 1
         img = np.zeros_like(imarray)
         pxyz = self.pixelrays(res)
-        imask = self.in_view(pxyz, indices=False)
         mask = other.in_view(pxyz, indices=False)
 
         pxyz = pxyz.reshape(-1, 3)

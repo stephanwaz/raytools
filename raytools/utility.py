@@ -26,7 +26,7 @@ class TStqdm(tqdm):
         if str(workers).lower() in ('thread', 't', 'threads'):
             pool = ThreadPoolExecutor()
         elif workers:
-            context = get_context('fork')
+            context = get_context('forkserver')
             nproc = io.get_nproc(cap)
             pool = ProcessPoolExecutor(nproc, mp_context=context)
         else:

@@ -165,8 +165,8 @@ def test_cull_vectors():
     xyz = translate.uv2xyz(uv)
     mask = translate.cull_vectors(xyz, np.pi/9)
     mask = mask.reshape(16, 8).T.astype(int)
-    assert np.alltrue(np.sum(mask, axis=0) == 4)
-    assert np.alltrue(np.sum(mask, axis=1) == 8)
+    assert np.all(np.sum(mask, axis=0) == 4)
+    assert np.all(np.sum(mask, axis=1) == 8)
 
 
 def test_reflect():
