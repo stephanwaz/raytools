@@ -9,7 +9,6 @@
 
 """progress bar"""
 import shutil
-from datetime import datetime
 
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from concurrent.futures import wait, FIRST_COMPLETED
@@ -20,21 +19,20 @@ from raytools import io
 
 
 class TStqdm(tqdm):
+    """object for managing tqdm progress bar, multiprcessing, and logging"""
 
-    def __init__(self, instance=None, tz=None, workers=False, position=0,
-                 desc=None, ncols=100, cap=None, **kwargs):
+    def __init__(self, instance=None, workers=False, position=0,
+                 desc=None, ncols=100, cap=None, context='fork', **kwargs):
         if str(workers).lower() in ('thread', 't', 'threads'):
             pool = ThreadPoolExecutor()
         elif workers:
-            context = get_context('forkserver')
+            context = get_context(context)
             nproc = io.get_nproc(cap)
             pool = ProcessPoolExecutor(nproc, mp_context=context)
         else:
             pool = None
         self._instance = instance
         self.loglevel = position
-        tf = "%H:%M:%S"
-        self.ts = datetime.now(tz=tz).strftime(tf)
         self.pool = pool
         self.wait = wait
         self.FIRST_COMPLETED = FIRST_COMPLETED
@@ -66,7 +64,7 @@ class TStqdm(tqdm):
 
 
 def pool_call(func, args, *fixed_args, cap=None, expandarg=True,
-              desc="processing", workers=True, pbar=True, **kwargs):
+              desc="processing", workers=True, pbar=True, context='fork', **kwargs):
     """calls func for a sequence of arguments using a ProcessPool executor
     and a progress bar. result is equivalent to::
 
@@ -95,6 +93,11 @@ def pool_call(func, args, *fixed_args, cap=None, expandarg=True,
         return threadpool ('t', 'threads', 'thread') or processpool (True)
     pbar: bool, optional
         display progress bar while executing
+    context: str, optional
+        'fork' or 'forkserver' this is for special cases that seem to emerge
+        with certain hardware/os/python version combinations where 'fork' has
+        issues. this option should go away once the correct platform settings
+        are determined
     kwargs:
         additional keyword arguments passed to func
     Returns
@@ -111,7 +114,7 @@ def pool_call(func, args, *fixed_args, cap=None, expandarg=True,
                 result.append(func(arg, *fixed_args, **kwargs))
         return result
     with TStqdm(workers=workers, total=len(args), cap=cap,
-                desc=desc, disable=not pbar) as pbar:
+                desc=desc, disable=not pbar, context=context) as pbar:
         exc = pbar.pool
         futures = []
         # submit asynchronous to process pool
