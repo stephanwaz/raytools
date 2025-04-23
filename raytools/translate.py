@@ -261,7 +261,7 @@ def xyz2tp(xyz):
 
 
 def aa2xyz(aa):
-    """calculate altitude (0-90), azimuth (-180,180) from xyz"""
+    """calculate xyz from altitude (0-90), azimuth (-180,180)"""
     aa = np.atleast_2d(aa)
     tp = np.pi/2 - aa * np.pi/180
     tp[:, 1] += np.pi
@@ -269,7 +269,7 @@ def aa2xyz(aa):
 
 
 def xyz2aa(xyz):
-    """calculate xyz from altitude (0-90), azimuth (-180,180)"""
+    """calculate altitude (0-90), azimuth (-180,180) from xyz"""
     xyz = np.atleast_2d(xyz)
     tp = xyz2tp(xyz)
     tp[:, 1] -= np.pi
